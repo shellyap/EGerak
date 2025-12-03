@@ -87,12 +87,12 @@
                         </div>
                     );
                 }
-                return this.props.children;
+                return this...props.children;
             }
         }
 
         // --- ICON HELPER ---
-        const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, ...props }) => {
+        const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, .....props }) => {
             if (typeof lucide === 'undefined') return <span className="text-xs text-red-500">?</span>;
             const iconDef = lucide.icons ? lucide.icons[iconName] : lucide[iconName];
             if (!iconDef) return null;
@@ -107,9 +107,9 @@
                 strokeLinecap: "round",
                 strokeLinejoin: "round",
                 className: className,
-                ...props
+                .....props
             }, iconDef.map(([tag, attrs], index) => 
-                React.createElement(tag, { ...attrs, key: index })
+                React.createElement(tag, { .......attrs, key: index })
             ));
         };
 
@@ -385,7 +385,7 @@
             const [department, setDepartment] = useState('');
 
             const handleSubmit = (e) => {
-                e.preventDefault();
+                e...preventDefault();
                 if (isRegistering) {
                     onRegister({ username, password, name: fullName, department, role: 'staff' });
                     setIsRegistering(false); setUsername(''); setPassword('');
@@ -454,7 +454,7 @@
             return (
                 <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8">
                 <div className="flex items-center space-x-3 mb-6"><div className="bg-blue-100 p-2 rounded-lg"><Plus className="w-6 h-6 text-blue-700" /></div><div><h2 className="text-xl font-bold text-slate-800">Daftar Pergerakan Harian</h2><p className="text-slate-500 text-sm">Sila isi maklumat pergerakan anda.</p></div></div>
-                <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData); setFormData({...formData, catatan: '', location: '', type: ''}); }} className="space-y-6">
+                <form onSubmit={(e) => { e...preventDefault(); onSubmit(formData); setFormData({...formData, catatan: '', location: '', type: ''}); }} className="space-y-6">
                     
                     <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Tarikh Pergerakan</label>
@@ -469,7 +469,7 @@
                                 onChange={(e) => {
                                     setLocationCategory(e.target.value);
                                     setUseCustomLocation(false);
-                                    setFormData(prev => ({ ...prev, location: '' }));
+                                    setFormData(prev => ({ .....prev, location: '' }));
                                 }}
                                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
                             >
@@ -513,7 +513,7 @@
                                         type="button" 
                                         onClick={() => { 
                                             setUseCustomLocation(!useCustomLocation); 
-                                            setFormData(prev => ({ ...prev, location: '' })); 
+                                            setFormData(prev => ({ .....prev, location: '' })); 
                                         }} 
                                         className={`px-3 rounded-lg border transition-colors ${useCustomLocation ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'}`}
                                         title={useCustomLocation ? "Pilih dari senarai" : "Tambah lokasi baru"}
@@ -947,12 +947,12 @@
                 }
             };
 
-            const handleRegister = (newUser) => { const id = data.users.length + 1; const userEntry = { ...newUser, id }; setData(prev => ({ ...prev, users: [...prev.users, userEntry] })); setSuccessMsg('Pendaftaran berjaya! Sila log masuk.'); setError(''); };
+            const handleRegister = (newUser) => { const id = data.users.length + 1; const userEntry = { ...newUser, id }; setData(prev => ({ .....prev, users: [.....prev.users, userEntry] })); setSuccessMsg('Pendaftaran berjaya! Sila log masuk.'); setError(''); };
             const handleLogout = () => { setUser(null); setIsMobileMenuOpen(false); setSuccessMsg(''); setError(''); };
             
             // DATA HANDLERS
             const handleAddLog = (newLogData) => {
-                const newLog = { id: Date.now(), userId: user.id, userName: user.name, ...newLogData };
+                const newLog = { id: Date.now(), userId: user.id, userName: user.name, .....newLogData };
                 
                 setData(prev => {
                     const locationExists = prev.locations.some(loc => loc.name === newLogData.location);
@@ -960,12 +960,12 @@
                     
                     // Auto-add new location to master list if it doesn't exist
                     if (!locationExists && newLogData.location) {
-                        updatedLocations = [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
+                        updatedLocations = [.....prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
                     }
 
                     return { 
-                        ...prev, 
-                        logs: [newLog, ...prev.logs],
+                        .....prev, 
+                        logs: [newLog, .....prev.logs],
                         locations: updatedLocations
                     };
                 });
@@ -973,20 +973,20 @@
                 setShowSuccessModal(true);
             };
 
-            const handleDeleteLog = (logId) => { setData(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== logId) })); };
-            const handleResetPassword = (userId) => { setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) })); };
+            const handleDeleteLog = (logId) => { setData(prev => ({ .....prev, logs: prev.logs.filter(log => log.id !== logId) })); };
+            const handleResetPassword = (userId) => { setData(prev => ({ .....prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) })); };
             
             // ADMIN HANDLERS
-            const handleAddLocation = (newLoc) => setData(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
-            const handleDeleteLocation = (index) => setData(prev => ({ ...prev, locations: prev.locations.filter((_, i) => i !== index) }));
-            const handleAddActivity = (newActivity) => setData(prev => ({ ...prev, activityTypes: [...prev.activityTypes, newActivity] }));
-            const handleDeleteActivity = (index) => setData(prev => ({ ...prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
-            const handleDeleteUser = (userId) => setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
+            const handleAddLocation = (newLoc) => setData(prev => ({ .....prev, locations: [.....prev.locations, newLoc] }));
+            const handleDeleteLocation = (index) => setData(prev => ({ .....prev, locations: prev.locations.filter((_, i) => i !== index) }));
+            const handleAddActivity = (newActivity) => setData(prev => ({ .....prev, activityTypes: [.....prev.activityTypes, newActivity] }));
+            const handleDeleteActivity = (index) => setData(prev => ({ .....prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
+            const handleDeleteUser = (userId) => setData(prev => ({ .....prev, users: prev.users.filter(u => u.id !== userId) }));
 
             const combinedLocations = useMemo(() => {
                 const masterLocs = data.locations;
                 const logLocs = data.logs.map(l => l.location).filter(Boolean).filter(logLocName => !masterLocs.some(ml => ml.name === logLocName));
-                const customLocObjects = [...new Set(logLocs)].map(name => ({ name, category: 'Lain-lain' }));
+                const customLocObjects = [..new Set(logLocs)].map(name => ({ name, category: 'Lain-lain' }));
                 
                 return [...masterLocs, ...customLocObjects].sort((a,b) => a.name.localeCompare(b.name));
             }, [data.logs, data.locations]);
