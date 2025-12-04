@@ -261,10 +261,7 @@
     static getDerivedStateFromError(err){ return { hasError:true, err }; }
     render(){ if(this.state.hasError) return <div className="p-6 bg-red-50 text-red-700 rounded">{String(this.state.err)}</div>; return this.props.children; }
   }
-
-  // ---------- END OF SEGMENT 1/6 ----------
-  <!-- ---------- SEGMENT 2/6: App, Header, Login, Staff area & Staff Entry ---------- -->
-  <script type="text/babel">
+   <script type="text/babel">
   // ---------- App ----------
   function App(){
     const [user,setUser] = useState(null);
@@ -511,9 +508,8 @@
       }
     }, [category, searchText, lainlainLocations]);
 
-  // ---------- END OF SEGMENT 2/6 ----------
+ 
   </script>
-  <!-- ---------- SEGMENT 3/6: StaffEntry (continued), StaffFilter, StaffReport ---------- -->
   <script type="text/babel">
     // Continue StaffEntry component
     const submit = (e) => {
@@ -751,10 +747,9 @@
     );
   }
 
-  // ---------- END SEGMENT 3/6 ----------
+ 
   </script>
-  <!-- ---------- SEGMENT 4/6: Admin Area + Tabs + Statistik + Leaderboard ---------- -->
-  <script type="text/babel">
+   <script type="text/babel">
 
   // ---------- Admin Area ----------
   function AdminArea({
@@ -1188,10 +1183,9 @@
     );
   }
 
-  // ---------- END SEGMENT 4/6 ----------
+  
   </script>
-  <!-- ---------- SEGMENT 5/6: Global Helpers + ReactDOM.render ---------- -->
-  <script type="text/babel">
+    <script type="text/babel">
 
   // ======================================================
   //                 GLOBAL HELPER FUNCTIONS
@@ -1336,8 +1330,7 @@
   root.render(<AppRoot />);
 
   </script>
-  <!-- ---------- SEGMENT 6/6: Fixed School Lists + Close HTML ---------- -->
-  <script type="text/babel">
+    <script type="text/babel">
 
   // ======================================================
   //        FIXED SEKOLAH RENDAH (72 ITEMS) — AUTO SUGGEST
