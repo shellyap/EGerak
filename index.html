@@ -2,13 +2,13 @@
 <html lang="ms">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>E-Gerak PPD Ranau</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>E-Gerak PPD Ranau — Firestore Collections (egerak/main/*)</title>
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- React & ReactDOM UMD (production) -->
+  <!-- React & ReactDOM UMD -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
@@ -22,1140 +22,645 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
-
-  <meta name="theme-color" content="#1e3a8a" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="E-Gerak" />
 
   <style>
-    @media print {
-      .no-print { display: none !important; }
-      .print-only { display: block !important; }
-      body { background: white; }
-    }
-    .animate-in { animation: fadeIn 0.28s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+    @media print { .no-print{display:none!important} }
+    .animate-in { animation: fadeIn .28s ease-out; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
   </style>
 
-  <!-- Firebase init (optional analytics) -->
+  <!-- Initialize Firebase (compat) -->
   <script>
+    // KEEP your existing firebaseConfig (from uploaded file). Replace if needed.
+    const firebaseConfig = {
+      apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do",
+      authDomain: "egerak-4f922.firebaseapp.com",
+      projectId: "egerak-4f922",
+      storageBucket: "egerak-4f922.firebasestorage.app",
+      messagingSenderId: "567427021114",
+      appId: "1:567427021114:web:cf5496d2fc14eb84893803",
+      measurementId: "G-V6CGGJ81JG"
+    };
     try {
-      const firebaseConfig = {
-        apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do",
-        authDomain: "egerak-4f922.firebaseapp.com",
-        projectId: "egerak-4f922",
-        storageBucket: "egerak-4f922.firebasestorage.app",
-        messagingSenderId: "567427021114",
-        appId: "1:567427021114:web:cf5496d2fc14eb84893803",
-        measurementId: "G-V6CGGJ81JG"
-      };
       firebase.initializeApp(firebaseConfig);
-      if (typeof firebase.analytics === 'function') firebase.analytics();
-      console.log('Firebase initialized (compat).');
+      console.log('Firebase (compat) initialized.');
     } catch (e) {
-      console.warn('Firebase init warning:', e);
+      console.error('Firebase init error', e);
     }
   </script>
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
 
-  <!-- App (JSX compiled by Babel) -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo, Component } = React;
+  const { useState, useEffect, useMemo, useRef, Component } = React;
 
-    // -------------------------
-    // Error Boundary
-    // -------------------------
-    class ErrorBoundary extends Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
-      static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-      }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="p-6 text-center text-red-600 bg-red-50 rounded-lg m-4 border border-red-200">
-              <h2 className="font-bold text-lg mb-2">Terjadi Ralat Sistem</h2>
-              <p className="text-sm font-mono">{this.state.error?.toString()}</p>
-              <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Muat Semula Halaman</button>
-            </div>
-          );
+  // ---------- ICONS ----------
+  const createIcon = (iconName) => ({ size = 20, className = '' }) => {
+    if (typeof lucide === 'undefined') return null;
+    const def = lucide.icons ? lucide.icons[iconName] : lucide[iconName];
+    if (!def) return null;
+    return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }, def.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i })));
+  };
+  const MapPin = createIcon('MapPin'), CheckCircle = createIcon('CheckCircle'), Plus = createIcon('Plus'), Trash2 = createIcon('Trash2'), Search = createIcon('Search'), UsersIc = createIcon('Users'), FileSpreadsheet = createIcon('FileSpreadsheet'), Printer = createIcon('Printer'), Filter = createIcon('Filter'), Calendar = createIcon('Calendar'), LogOut = createIcon('LogOut');
+
+  // ---------- INITIAL DATA (used to seed collections if empty) ----------
+  const CURRENT_YEAR = new Date().getFullYear();
+  const INITIAL_DATA = {
+    users: [
+      { id: 1, username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT / Pengurusan' },
+      { id: 2, username: 'staff', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' },
+      { id: 3, username: 'guru', password: '123', role: 'staff', name: 'Pn. Siti', department: 'Unit Akademik' }
+    ],
+    logs: [
+      { id: 101, userId: 2, userName: 'En. Razak', type: 'Lawatan Tapak', location: 'SK Kilimu', date: `${CURRENT_YEAR}-10-24`, catatan: 'Memantau projek pembinaan blok baharu.' },
+      { id: 102, userId: 2, userName: 'En. Razak', type: 'Mesyuarat', location: 'PPD Kota Kinabalu', date: `${CURRENT_YEAR}-10-25`, catatan: 'Mesyuarat penyelarasan aset.' },
+      { id: 103, userId: 3, userName: 'Pn. Siti', type: 'Bengkel', location: 'SMK Ranau', date: `${CURRENT_YEAR}-10-24`, catatan: 'Bengkel KSSM Sains.' }
+    ],
+    locations: [
+      { name: 'PPD Ranau', category: 'Lain-lain' },
+      { name: 'JPN Sabah', category: 'Lain-lain' },
+      { name: 'PPD Kota Kinabalu', category: 'Lain-lain' },
+      { name: 'SK Pekan Ranau', category: 'Sekolah Rendah' },
+      { name: 'SK Kilimu', category: 'Sekolah Rendah' },
+      { name: 'SMK Ranau', category: 'Sekolah Menengah' }
+    ],
+    activityTypes: [
+      'Lawatan Bimbingan', 'Mesyuarat', 'Bengkel', 'Urusan Rasmi', 'Pemantauan', 'Lawatan Tapak'
+    ]
+  };
+
+  // ---------- Firestore references (collections under egerak/main) ----------
+  const db = firebase.firestore();
+  const rootDoc = db.collection('egerak').doc('main');
+  const usersCol = () => rootDoc.collection('users');
+  const logsCol = () => rootDoc.collection('logs');
+  const locationsCol = () => rootDoc.collection('locations');
+  const typesCol = () => rootDoc.collection('activityTypes');
+
+  // Ensure root doc exists and seed collections if empty
+  async function ensureCollectionsSeeded() {
+    try {
+      // create root doc if missing
+      const docSnap = await rootDoc.get();
+      if (!docSnap.exists) await rootDoc.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+      // check each collection and seed if empty
+      const seedIfEmpty = async (colRef, items, mapFn = (i) => i) => {
+        const snap = await colRef.limit(1).get();
+        if (snap.empty) {
+          const batch = db.batch();
+          items.forEach((item) => {
+            const ref = colRef.doc(); // auto id
+            batch.set(ref, mapFn(item));
+          });
+          await batch.commit();
         }
-        return this.props.children;
-      }
+      };
+
+      await seedIfEmpty(usersCol(), INITIAL_DATA.users, (u) => ({ ...u }));
+      await seedIfEmpty(locationsCol(), INITIAL_DATA.locations, (l) => ({ ...l }));
+      await seedIfEmpty(typesCol(), INITIAL_DATA.activityTypes.map(t => ({ name: t })), (t) => ({ name: t.name || t }));
+      await seedIfEmpty(logsCol(), INITIAL_DATA.logs, (l) => ({ ...l }));
+      console.log('Collections ensured/seeded if empty.');
+    } catch (e) {
+      console.error('Seeding error', e);
+      throw e;
+    }
+  }
+
+  // ---------- Utility ----------
+  const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    const parts = dateString.split('-');
+    if (parts.length !== 3) return dateString;
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year.slice(-2)}`;
+  };
+
+  const downloadCSV = (data, filename) => {
+    const headers = ["Tarikh", "Nama", "Tujuan", "Lokasi", "Catatan"];
+    const rows = data.map(row => [ formatDate(row.date), row.userName, row.type, row.location, (row.catatan||'').replace(/(\r\n|\n|\r)/gm, ' ') ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(","))].join("\n");
+    const link = document.createElement('a'); link.setAttribute('href', encodeURI(csvContent)); link.setAttribute('download', filename); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  // ---------- Simple ErrorBoundary ----------
+  class ErrorBoundary extends Component {
+    constructor(props){ super(props); this.state={hasError:false,err:null}; }
+    static getDerivedStateFromError(err){ return { hasError:true, err }; }
+    render(){ if(this.state.hasError) return (<div className="p-6 text-center text-red-600 bg-red-50 rounded m-4">{String(this.state.err)}</div>); return this.props.children; }
+  }
+
+  // ---------- App ----------
+  function App(){
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+    const [users, setUsers] = useState([]);
+    const [logs, setLogs] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [activityTypes, setActivityTypes] = useState([]);
+
+    // subscribe to collections (real-time)
+    useEffect(() => {
+      let unsubUsers, unsubLogs, unsubLocs, unsubTypes;
+      (async () => {
+        try {
+          await ensureCollectionsSeeded();
+
+          unsubUsers = usersCol().orderBy('id','asc').onSnapshot(snap => {
+            const arr = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+            setUsers(arr);
+          });
+
+          unsubLocs = locationsCol().orderBy('name').onSnapshot(snap => { setLocations(snap.docs.map(d => ({ docId: d.id, ...d.data() }))); });
+
+          unsubTypes = typesCol().orderBy('name').onSnapshot(snap => { setActivityTypes(snap.docs.map(d => ({ docId: d.id, name: d.data().name }))); });
+
+          unsubLogs = logsCol().orderBy('date','desc').onSnapshot(snap => { setLogs(snap.docs.map(d => ({ docId: d.id, ...d.data() }))); });
+
+          setLoading(false);
+        } catch (e) {
+          console.error(e); setError('Gagal sambung ke pangkalan data.'); setLoading(false);
+        }
+      })();
+
+      return () => {
+        if (unsubUsers) unsubUsers(); if (unsubLogs) unsubLogs(); if (unsubLocs) unsubLocs(); if (unsubTypes) unsubTypes();
+      };
+    }, []);
+
+    // ---------- Auth (local simple auth backed by users collection) ----------
+    const handleLogin = (username, password) => {
+      setError('');
+      const found = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+      if (found) { setUser(found); setSuccessMsg(''); } else setError('ID Pengguna atau kata laluan tidak sah.');
+    };
+
+    const handleRegister = async ({ username, password, name, department }) => {
+      try {
+        // ensure unique username
+        if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) return setError('Username sudah wujud.');
+        // compute next numeric id
+        const maxId = users.reduce((m,u)=>Math.max(m, u.id||0), 0);
+        await usersCol().add({ id: maxId + 1, username, password, role: 'staff', name, department: department || '' });
+        setSuccessMsg('Pendaftaran berjaya, sila log masuk.'); setError('');
+      } catch (e) { console.error(e); setError('Gagal daftar pengguna.'); }
+    };
+
+    const handleLogout = () => { setUser(null); setError(''); setSuccessMsg(''); };
+
+    // ---------- CRUD operations (collections) ----------
+    async function addLog(newLogData){
+      if(!user) return setError('Sila log masuk terlebih dahulu.');
+      try {
+        const idVal = Date.now();
+        const payload = { id: idVal, userId: user.id, userName: user.name, ...newLogData };
+        await logsCol().add(payload);
+
+        // ensure location exists (if provided)
+        if (newLogData.location) {
+          const exists = locations.some(l => l.name === newLogData.location);
+          if (!exists) {
+            await locationsCol().add({ name: newLogData.location, category: 'Lain-lain' });
+          }
+        }
+        setSuccessMsg('Rekod berjaya disimpan.');
+        setTimeout(()=>setSuccessMsg(''), 2500);
+      } catch(e) { console.error(e); setError('Gagal simpan rekod.'); }
     }
 
-    // -------------------------
-    // Icon helper (Lucide)
-    // -------------------------
-    const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, ...props }) => {
-      if (typeof lucide === 'undefined') return <span className="text-xs text-red-500">?</span>;
-      // lucide.icons may be available as an object or as functions; we handle common format
-      const iconDef = lucide.icons ? lucide.icons[iconName] : lucide[iconName];
-      if (!iconDef) return null;
-      // iconDef is an array of [tag, attrs] entries
-      return React.createElement('svg', {
-        xmlns: "http://www.w3.org/2000/svg",
-        width: size,
-        height: size,
-        viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: color,
-        strokeWidth: 2,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        className,
-        ...props
-      }, iconDef.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i })));
-    };
+    async function deleteLog(docId){
+      try { await logsCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam rekod.'); }
+    }
 
-    // define icons used
-    const User = createIcon('User');
-    const Lock = createIcon('Lock');
-    const MapPin = createIcon('MapPin');
-    const FileText = createIcon('FileText');
-    const LogOut = createIcon('LogOut');
-    const CheckCircle = createIcon('CheckCircle');
-    const Clock = createIcon('Clock');
-    const Menu = createIcon('Menu');
-    const X = createIcon('X');
-    const Plus = createIcon('Plus');
-    const Search = createIcon('Search');
-    const BarChart3 = createIcon('BarChart3');
-    const Users = createIcon('Users');
-    const Building = createIcon('Building');
-    const Calendar = createIcon('Calendar');
-    const Filter = createIcon('Filter');
-    const Download = createIcon('Download');
-    const FileSpreadsheet = createIcon('FileSpreadsheet');
-    const Printer = createIcon('Printer');
-    const ChevronRight = createIcon('ChevronRight');
-    const List = createIcon('List');
-    const Edit3 = createIcon('Edit3');
-    const Info = createIcon('Info');
-    const Trash2 = createIcon('Trash2');
-    const AlertTriangle = createIcon('AlertTriangle');
-    const Settings = createIcon('Settings');
-    const AlertCircle = createIcon('AlertCircle');
-    const Trophy = createIcon('Trophy');
-    const PieChart = createIcon('PieChart');
-    const TrendingUp = createIcon('TrendingUp');
-    const RefreshCw = createIcon('RefreshCw');
-    const School = createIcon('School');
-    const Building2 = createIcon('Building2');
-    const HelpCircle = createIcon('HelpCircle');
+    async function addLocation(obj){
+      try {
+        // prevent duplicate name
+        if (locations.some(l => l.name === obj.name)) return setError('Lokasi sudah wujud.');
+        await locationsCol().add(obj);
+      } catch(e){ console.error(e); setError('Gagal tambah lokasi.'); }
+    }
+    async function deleteLocation(docId){ try { await locationsCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam lokasi.'); } }
 
-    // -------------------------
-    // PWA manifest setup (creates runtime manifest pointing to local icons if present)
-    // -------------------------
-    const PWASetup = () => {
-      useEffect(() => {
-        const setup = () => {
-          const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-          const icons = {
-            icon192: baseUrl + 'icon-192.png',
-            icon152: baseUrl + 'icon-152.png',
-            icon512: baseUrl + 'icon-512.png'
-          };
-          const manifest = {
-            name: "E-Gerak PPD Ranau",
-            short_name: "E-Gerak",
-            start_url: ".",
-            display: "standalone",
-            background_color: "#ffffff",
-            theme_color: "#1e3a8a",
-            description: "Sistem Pengurusan Pergerakan Pegawai PPD Ranau",
-            icons: [
-              { src: icons.icon192, sizes: "192x192", type: "image/png" },
-              { src: icons.icon152, sizes: "152x152", type: "image/png" },
-              { src: icons.icon512, sizes: "512x512", type: "image/png" }
-            ]
-          };
-          const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          let link = document.querySelector('#manifest-link');
-          if (!link) {
-            link = document.createElement('link');
-            link.id = 'manifest-link';
-            link.rel = 'manifest';
-            document.head.appendChild(link);
-          }
-          link.href = url;
-          // apple icon
-          let apple = document.querySelector('link[rel="apple-touch-icon"]');
-          if (!apple) {
-            apple = document.createElement('link');
-            apple.rel = 'apple-touch-icon';
-            document.head.appendChild(apple);
-          }
-          apple.href = icons.icon152;
-        };
-        setup();
-      }, []);
-      return null;
-    };
+    async function addActivityType(name){ try { if (activityTypes.some(t=>t.name===name)) return setError('Perkara sudah wujud.'); await typesCol().add({ name }); } catch(e){ console.error(e); setError('Gagal tambah perkara.'); } }
+    async function deleteActivityType(docId){ try { await typesCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam perkara.'); } }
 
-    // -------------------------
-    // Data (initial)
-    // -------------------------
-    const CURRENT_YEAR = new Date().getFullYear();
-    const INITIAL_DATA = {
-      users: [
-        { id: 1, username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT / Pengurusan' },
-        { id: 2, username: 'staff', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' },
-        { id: 3, username: 'guru', password: '123', role: 'staff', name: 'Pn. Siti', department: 'Unit Akademik' },
-        { id: 4, username: 'razak_double', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' }
-      ],
-      logs: [
-        { id: 101, userId: 2, userName: 'En. Razak', type: 'Lawatan Tapak', location: 'SK Kilimu', date: `${CURRENT_YEAR}-10-24`, catatan: 'Memantau projek pembinaan blok baharu.' },
-        { id: 102, userId: 2, userName: 'En. Razak', type: 'Mesyuarat', location: 'PPD Kota Kinabalu', date: `${CURRENT_YEAR}-10-25`, catatan: 'Mesyuarat penyelarasan aset.' },
-        { id: 103, userId: 3, userName: 'Pn. Siti', type: 'Bengkel', location: 'SMK Ranau', date: `${CURRENT_YEAR}-10-24`, catatan: 'Bengkel KSSM Sains.' },
-        { id: 104, userId: 1, userName: 'Shell Yap', type: 'Urusan Rasmi', location: 'JPN Sabah', date: `${CURRENT_YEAR}-10-20`, catatan: 'Menghantar laporan bulanan.' },
-        { id: 105, userId: 2, userName: 'En. Razak', type: 'Pemantauan', location: 'SK Narawang', date: `${CURRENT_YEAR}-11-01`, catatan: 'Pemantauan kerosakan bumbung.' },
-        { id: 106, userId: 2, userName: 'En. Razak', type: 'Lawatan Bimbingan', location: 'SK Pekan', date: new Date().toISOString().split('T')[0], catatan: 'Bimbingan guru baharu.' },
-        { id: 107, userId: 3, userName: 'Pn. Siti', type: 'Lawatan Bimbingan', location: 'SK Kilimu', date: `${CURRENT_YEAR}-11-02`, catatan: 'Coaching & Mentoring Panitia Sains.' },
-        { id: 108, userId: 3, userName: 'Pn. Siti', type: 'Lawatan Bimbingan', location: 'SMK Mat Salleh', date: `${CURRENT_YEAR}-11-05`, catatan: 'Bimbingan PBD.' },
-      ],
-      locations: [
-        { name: 'PPD Ranau', category: 'Lain-lain' },
-        { name: 'JPN Sabah', category: 'Lain-lain' },
-        { name: 'PPD Kota Kinabalu', category: 'Lain-lain' },
-        { name: 'SK Pekan Ranau', category: 'Sekolah Rendah' },
-        { name: 'SK Kilimu', category: 'Sekolah Rendah' },
-        { name: 'SK Narawang', category: 'Sekolah Rendah' },
-        { name: 'SK Lohan', category: 'Sekolah Rendah' },
-        { name: 'SMK Ranau', category: 'Sekolah Menengah' },
-        { name: 'SMK Mat Salleh', category: 'Sekolah Menengah' }
-      ],
-      activityTypes: [
-        'Lawatan Bimbingan', 'Mesyuarat', 'Bengkel', 'Urusan Rasmi',
-        'Pemantauan', 'Kunjung Bantu', 'Taklimat', 'Lawatan Tapak'
-      ]
-    };
+    async function addUser(newUser){
+      try {
+        if (users.some(u=>u.username.toLowerCase()===newUser.username.toLowerCase())) return setError('Username already exists.');
+        const maxId = users.reduce((m,u)=>Math.max(m, u.id||0), 0);
+        await usersCol().add({ id: maxId+1, ...newUser });
+      } catch(e){ console.error(e); setError('Gagal tambah pengguna.'); }
+    }
+    async function deleteUser(docId){ try { await usersCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam pengguna.'); } }
+    async function resetUserPassword(docId){ try { await usersCol().doc(docId).update({ password: '123' }); } catch(e){ console.error(e); setError('Gagal reset password.'); } }
 
-    // -------------------------
-    // Utilities
-    // -------------------------
-    const formatDate = (dateString) => {
-      if (!dateString) return '-';
-      const parts = dateString.split('-');
-      if (parts.length !== 3) return dateString;
-      const [year, month, day] = parts;
-      return `${day}/${month}/${year.slice(-2)}`;
-    };
+    // Derived lists
+    const combinedLocations = useMemo(() => {
+      const masterLocs = locations || [];
+      const logLocs = Array.from(new Set((logs || []).map(l=>l.location).filter(Boolean))).filter(name => !masterLocs.some(m=>m.name===name)).map(n=>({ name: n, category: 'Lain-lain' }));
+      return [...masterLocs, ...logLocs].sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+    }, [locations, logs]);
 
-    const downloadCSV = (data, filename) => {
-      const headers = ["Tarikh", "Nama", "Tujuan", "Lokasi", "Catatan"];
-      const rows = data.map(row => [
-        formatDate(row.date),
-        row.userName,
-        row.type,
-        row.location,
-        row.catatan || ''
-      ]);
-      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    };
+    const combinedActivityTypes = useMemo(() => {
+      const types = (activityTypes || []).map(t => t.name || t).filter(Boolean);
+      const fromLogs = Array.from(new Set((logs || []).map(l => l.type).filter(Boolean)));
+      return Array.from(new Set([...types, ...fromLogs])).sort();
+    }, [activityTypes, logs]);
 
-    // -------------------------
-    // Small reusable UI bits
-    // -------------------------
-    const SuccessModal = ({ isOpen, onClose, message }) => {
-      if (!isOpen) return null;
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-in">
-          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Berjaya!</h3>
-              <p className="text-slate-600 mb-6">{message}</p>
-              <button onClick={onClose} className="w-full bg-blue-900 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800">Tutup</button>
+    const allUserNames = useMemo(()=> Array.from(new Set([...(users||[]).map(u=>u.name), ...(logs||[]).map(l=>l.userName)])).sort(), [users, logs]);
+
+    if (loading) return <div className="min-h-screen flex items-center justify-center">Menyambung ke pangkalan data...</div>;
+
+    if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} successMsg={successMsg} />;
+
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <ErrorBoundary>
+          <div className="p-4 md:p-6 bg-white border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-900 text-white p-2 rounded"><MapPin size={18} /></div>
+              <div><h1 className="text-lg font-bold">E-Gerak</h1><div className="text-xs text-slate-500">PPD Ranau</div></div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-slate-600">{user.name} ({user.role})</div>
+              <button onClick={handleLogout} className="bg-red-600 text-white px-3 py-2 rounded flex items-center gap-2"><LogOut size={16}/>Log Keluar</button>
             </div>
           </div>
-        </div>
-      );
-    };
 
-    const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, itemName, isResetPassword = false }) => {
-      if (!isOpen) return null;
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-in">
-          <div className={`bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border ${isResetPassword ? 'border-orange-100' : 'border-red-100'}`}>
-            <div className="text-center">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isResetPassword ? 'bg-orange-100' : 'bg-red-100'}`}>
-                {isResetPassword ? <RefreshCw className="w-8 h-8 text-orange-600" /> : <AlertCircle className="w-8 h-8 text-red-600" />}
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">{isResetPassword ? 'Reset Kata Laluan?' : 'Pengesahan Padam'}</h3>
-              <p className="text-slate-600 mb-6">
-                {isResetPassword
-                  ? <span>Kata laluan untuk <strong>"{itemName}"</strong> akan ditetapkan semula kepada <strong>"123"</strong>.</span>
-                  : <span>Adakah anda pasti mahu memadam <strong>"{itemName}"</strong>?<br /><span className="text-xs text-red-500">Tindakan ini tidak boleh dikembalikan.</span></span>
-                }
-              </p>
-              <div className="flex space-x-3">
-                <button onClick={onClose} className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg">Batal</button>
-                <button onClick={onConfirm} className={`flex-1 text-white py-2.5 rounded-lg ${isResetPassword ? 'bg-orange-600 hover:bg-orange-700' : 'bg-red-600 hover:bg-red-700'}`}>{isResetPassword ? 'Ya, Reset' : 'Ya, Padam'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    // ConicPieChart (pure css/conic-gradient)
-    const ConicPieChart = ({ data, totalLabel = "Rekod" }) => {
-      const total = data.reduce((s, i) => s + i.value, 0);
-      if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 rounded-full w-48 mx-auto text-sm bg-slate-50">Tiada Data</div>;
-      let current = 0;
-      const parts = data.map((d) => {
-        const start = current;
-        const percent = (d.value / total) * 100;
-        current += percent;
-        return `${d.color} ${start}% ${current}%`;
-      }).join(', ');
-      return (
-        <div className="flex flex-col items-center">
-          <div className="w-48 h-48 rounded-full shadow-lg mb-6 relative" style={{ background: `conic-gradient(${parts})` }}>
-            <div className="absolute inset-0 m-auto w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-inner">
-              <div className="text-center">
-                <span className="text-2xl font-bold text-slate-800 block">{total}</span>
-                <span className="text-xs text-slate-500 uppercase tracking-wide">{totalLabel}</span>
-              </div>
-            </div>
-          </div>
-          <div className="w-full px-4">
-            {data.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center text-sm border-b border-slate-50 pb-1 last:border-0">
-                <div className="flex items-center">
-                  <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></span>
-                  <span className="text-slate-600 truncate max-w-[120px]" title={item.label}>{item.label}</span>
-                </div>
-                <span className="font-semibold text-slate-800">{Math.round((item.value / total) * 100)}% <span className="text-slate-400 text-xs font-normal">({item.value})</span></span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    };
-
-    // -------------------------
-    // Login Page
-    // -------------------------
-    const LoginPage = ({ onLogin, onRegister, error, setError, successMsg }) => {
-      const [isRegistering, setIsRegistering] = useState(false);
-      const [roleTab, setRoleTab] = useState('staff');
-      const [username, setUsername] = useState('');
-      const [password, setPassword] = useState('');
-      const [fullName, setFullName] = useState('');
-      const [department, setDepartment] = useState('');
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (isRegistering) {
-          onRegister({ username, password, name: fullName, department, role: 'staff' });
-          setIsRegistering(false);
-          setUsername('');
-          setPassword('');
-        } else {
-          onLogin(username, password, roleTab);
-        }
-      };
-
-      return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
-            <div className="bg-blue-900 p-8 text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-full bg-blue-800 opacity-20 transform -skew-y-6 origin-top-left"></div>
-              <div className="relative z-10">
-                <div className="w-16 h-16 bg-white rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg">
-                  <MapPin className="text-blue-900 w-8 h-8" />
-                </div>
-                <h1 className="text-2xl font-bold text-white tracking-wide">E-Gerak</h1>
-                <p className="text-blue-200 text-sm mt-1">Pejabat Pendidikan Daerah Ranau</p>
-              </div>
-            </div>
-            <div className="p-8">
-              {!isRegistering && (
-                <div className="flex bg-slate-100 rounded-lg p-1 mb-6">
-                  <button onClick={() => setRoleTab('staff')} className={`flex-1 py-2 text-sm font-medium rounded-md ${roleTab === 'staff' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-500'}`}>Staf / Pegawai</button>
-                  <button onClick={() => setRoleTab('admin')} className={`flex-1 py-2 text-sm font-medium rounded-md ${roleTab === 'admin' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-500'}`}>Admin / Pentadbir</button>
-                </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="md:col-span-3 space-y-6">
+              {user.role === 'staff' ? (
+                <StaffArea user={user} logs={logs} onAddLog={addLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
+              ) : (
+                <AdminArea user={user} logs={logs} users={users} locations={locations} activityTypes={activityTypes}
+                  onAddLocation={addLocation} onDeleteLocation={deleteLocation}
+                  onAddActivity={addActivityType} onDeleteActivity={deleteActivityType}
+                  onAddUser={addUser} onDeleteUser={deleteUser} onResetUserPassword={resetUserPassword}
+                  onDeleteLog={(docId)=>deleteLog(docId)}
+                  combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} allUserNames={allUserNames}
+                />
               )}
-              {isRegistering && (<div className="mb-6 text-center"><h2 className="text-lg font-bold text-slate-800">Pendaftaran Pengguna Baru</h2><p className="text-xs text-slate-500">Sila isi maklumat untuk akaun kali pertama.</p></div>)}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {isRegistering && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Nama Penuh</label>
-                      <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value.toUpperCase())} className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Unit / Sekolah</label>
-                      <input type="text" required value={department} onChange={(e) => setDepartment(e.target.value)} className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50" />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">ID Pengguna</label>
-                  <input type="text" required value={username} onChange={(e) => setUsername(e.target.value)} className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50" placeholder={roleTab === 'admin' ? "admin" : "staff"} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Kata Laluan</label>
-                  <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="block w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50" placeholder="•••••••" />
-                </div>
-                {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center"><span className="mr-2">⚠️</span> {error}</div>}
-                {successMsg && !isRegistering && <div className="bg-green-50 text-green-600 text-sm p-3 rounded-lg flex items-center"><span className="mr-2">✅</span> {successMsg}</div>}
-                <button type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-800">{isRegistering ? 'Daftar Akaun' : 'Log Masuk'}</button>
-              </form>
-              <div className="mt-6 text-center pt-4 border-t border-slate-100">
-                {!isRegistering
-                  ? (<p className="text-sm text-slate-600">Pengguna kali pertama? <button onClick={() => { setIsRegistering(true); setRoleTab('staff'); setError(''); }} className="text-blue-600 font-bold hover:underline">Daftar di sini</button></p>)
-                  : (<button onClick={() => setIsRegistering(false)} className="text-sm text-blue-600 hover:text-blue-800">← Kembali ke Log Masuk</button>)
-                }
-              </div>
+            </div>
+
+            <aside className="hidden md:block bg-white border border-slate-100 p-4 rounded-lg h-fit">
+              <h3 className="font-bold mb-2">Pantau Cepat</h3>
+              <div className="text-sm text-slate-600 mb-3">Jumlah rekod: <strong>{logs.length}</strong></div>
+              <div className="text-sm text-slate-600 mb-3">Pengguna terdaftar: <strong>{users.length}</strong></div>
+              <div className="text-sm text-slate-600">Lokasi: <strong>{locations.length}</strong></div>
+            </aside>
+          </div>
+
+          <div className="p-6">
+            {error && <div className="bg-red-50 text-red-700 p-3 rounded mb-4">{error}</div>}
+            {successMsg && <div className="bg-green-50 text-green-700 p-3 rounded mb-4">{successMsg}</div>}
+            <div className="text-xs text-slate-400">Data disimpan dalam koleksi Firestore: <code>egerak/main/{'{users,logs,locations,activityTypes}'}</code></div>
+          </div>
+        </ErrorBoundary>
+      </div>
+    );
+  }
+
+  // ---------- Login Component ----------
+  function LoginPage({ onLogin, onRegister, error, successMsg }){
+    const [isRegister, setIsRegister] = useState(false);
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [department, setDepartment] = useState('');
+    const [roleTab, setRoleTab] = useState('staff');
+
+    const submit = (e) => { e.preventDefault(); if(isRegister) { onRegister({ username, password, name: fullName, department }); setUsername(''); setPassword(''); setFullName(''); setDepartment(''); setIsRegister(false); } else onLogin(username, password); };
+
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white shadow rounded-xl overflow-hidden border border-slate-100">
+          <div className="p-6 bg-blue-900 text-white text-center">
+            <div className="mx-auto w-12 h-12 bg-white text-blue-900 rounded-full flex items-center justify-center mb-2"><MapPin size={18} /></div>
+            <h2 className="font-bold text-xl">E-Gerak</h2>
+            <div className="text-xs opacity-80">PPD Ranau</div>
+          </div>
+          <div className="p-6">
+            {!isRegister && <div className="flex gap-2 bg-slate-100 rounded p-1 mb-4">
+              <button onClick={()=>setRoleTab('staff')} className={`flex-1 py-2 ${roleTab==='staff' ? 'bg-white text-blue-900 shadow' : 'text-slate-500'}`}>Staf</button>
+              <button onClick={()=>setRoleTab('admin')} className={`flex-1 py-2 ${roleTab==='admin'? 'bg-white text-blue-900 shadow' : 'text-slate-500'}`}>Admin</button>
+            </div>}
+            <form onSubmit={submit} className="space-y-3">
+              {isRegister && <>
+                <input required placeholder="Nama Penuh" value={fullName} onChange={e=>setFullName(e.target.value)} className="w-full p-2 border rounded" />
+                <input placeholder="Jabatan / Unit" value={department} onChange={e=>setDepartment(e.target.value)} className="w-full p-2 border rounded" />
+              </>}
+              <input required placeholder="ID Pengguna" value={username} onChange={e=>setUsername(e.target.value)} className="w-full p-2 border rounded" />
+              <input required type="password" placeholder="Kata Laluan" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-2 border rounded" />
+              {error && <div className="text-red-600 text-sm">{error}</div>}
+              {successMsg && <div className="text-green-600 text-sm">{successMsg}</div>}
+              <button type="submit" className="w-full bg-blue-900 text-white py-2 rounded">{isRegister ? 'Daftar' : 'Log Masuk'}</button>
+            </form>
+            <div className="mt-4 text-center">
+              {!isRegister ? <button onClick={()=>setIsRegister(true)} className="text-sm text-blue-600">Pengguna baru? Daftar</button> : <button onClick={()=>setIsRegister(false)} className="text-sm text-blue-600">Kembali ke Log Masuk</button>}
             </div>
           </div>
         </div>
-      );
-    };
+      </div>
+    );
+  }
 
-    // -------------------------
-    // Staff components: entry / filter / report
-    // -------------------------
-    const StaffEntryTab = ({ onSubmit, availableLocations = [], availableTypes = [] }) => {
-      const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], location: '', type: '', catatan: '' });
-      const [useCustomType, setUseCustomType] = useState(false);
-      const [locationCategory, setLocationCategory] = useState('Sekolah Rendah');
-      const [useCustomLocation, setUseCustomLocation] = useState(false);
-
-      const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-
-      const filteredLocations = availableLocations.filter(loc => loc && loc.category === locationCategory).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!formData.date || !formData.location || !formData.type) return;
-        onSubmit(formData);
-        setFormData(prev => ({ ...prev, catatan: '', location: '', type: '' }));
-      };
-
-      return (
-        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="bg-blue-100 p-2 rounded-lg"><Plus className="w-6 h-6 text-blue-700" /></div>
-            <div>
-              <h2 className="text-xl font-bold text-slate-800">Daftar Pergerakan Harian</h2>
-              <p className="text-slate-500 text-sm">Sila isi maklumat pergerakan anda.</p>
-            </div>
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Tarikh Pergerakan</label>
-              <input type="date" name="date" required value={formData.date} onChange={handleChange} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg" />
-            </div>
-
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">1. Kategori Lokasi</label>
-                <select value={locationCategory} onChange={(e) => { setLocationCategory(e.target.value); setUseCustomLocation(false); setFormData(prev => ({ ...prev, location: '' })); }} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg">
-                  <option value="Sekolah Rendah">Sekolah Rendah</option>
-                  <option value="Sekolah Menengah">Sekolah Menengah</option>
-                  <option value="Lain-lain">Lain-lain</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">2. Lokasi / Tempat</label>
-                <div className="flex gap-2">
-                  <div className="relative w-full">
-                    {useCustomLocation ? (
-                      <input type="text" name="location" required value={formData.location} onChange={handleChange} placeholder="Taip nama lokasi baru..." className="w-full px-4 py-2.5 border border-slate-300 rounded-lg" />
-                    ) : (
-                      <select name="location" required value={formData.location} onChange={handleChange} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg">
-                        <option value="">Sila Pilih Lokasi...</option>
-                        {filteredLocations.map((loc, idx) => (<option key={idx} value={loc.name}>{loc.name}</option>))}
-                      </select>
-                    )}
-                  </div>
-                  {locationCategory === 'Lain-lain' && (
-                    <button type="button" onClick={() => { setUseCustomLocation(!useCustomLocation); setFormData(prev => ({ ...prev, location: '' })); }} className={`px-3 rounded-lg border ${useCustomLocation ? 'bg-slate-200' : 'bg-blue-50 text-blue-600'}`} title={useCustomLocation ? "Pilih dari senarai" : "Tambah lokasi baru"}>
-                      {useCustomLocation ? <List className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Perkara / Tujuan</label>
-              <div className="flex gap-2">
-                <div className="relative w-full">
-                  {useCustomType ? (
-                    <input type="text" name="type" required value={formData.type} onChange={handleChange} placeholder="Sila taip tujuan baru..." className="w-full px-4 py-2.5 border border-slate-300 rounded-lg" />
-                  ) : (
-                    <select name="type" required value={formData.type} onChange={handleChange} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg">
-                      <option value="">Pilih Tujuan...</option>
-                      {availableTypes.map((type, idx) => (<option key={idx} value={type}>{type}</option>))}
-                    </select>
-                  )}
-                </div>
-                <button type="button" onClick={() => { setUseCustomType(!useCustomType); setFormData(prev => ({ ...prev, type: '' })); }} className="px-3 bg-slate-100 rounded-lg border">
-                  {useCustomType ? <List className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Catatan</label>
-              <textarea name="catatan" rows="3" value={formData.catatan} onChange={handleChange} placeholder="Catatan tambahan..." className="w-full px-4 py-2.5 border border-slate-300 rounded-lg"></textarea>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100">
-              <button type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center space-x-2"><CheckCircle className="w-5 h-5" /><span>Hantar Rekod</span></button>
-            </div>
-          </form>
+  // ---------- Staff area (entry / filter / report tabs) ----------
+  function StaffArea({ user, logs, onAddLog, combinedLocations, combinedActivityTypes }){
+    const [tab, setTab] = useState('entry');
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">Selamat Datang, {user.name}</h2>
+          <div className="text-sm text-slate-500">{user.department}</div>
         </div>
-      );
-    };
+        <div className="flex gap-2 mb-6">
+          <button onClick={()=>setTab('entry')} className={tab==='entry' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Daftar Pergerakan</button>
+          <button onClick={()=>setTab('filter')} className={tab==='filter' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Saring Rekod</button>
+          <button onClick={()=>setTab('report')} className={tab==='report' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Laporan</button>
+        </div>
 
-    const StaffFilterTab = ({ logs = [], combinedLocations = [], combinedActivityTypes = [] }) => {
-      const [filterDate, setFilterDate] = useState('');
-      const [filterPlace, setFilterPlace] = useState('');
-      const [filterType, setFilterType] = useState('');
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const isFilterActive = filterDate || filterPlace || filterType;
-      const filteredLogs = logs.filter(log => {
-        if (!isFilterActive) return log.date && log.date.startsWith(currentMonth);
-        return (filterDate ? log.date === filterDate : true) &&
-          (filterPlace ? log.location === filterPlace : true) &&
-          (filterType ? log.type === filterType : true);
-      });
+        {tab==='entry' && <StaffEntry onSubmit={onAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+        {tab==='filter' && <StaffFilter logs={logs} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+        {tab==='report' && <StaffReport logs={logs} />}
+      </div>
+    );
+  }
 
-      return (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring & Cari Rekod</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm" />
-              <select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                <option value="">Semua Lokasi</option>
-                {combinedLocations.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
+  function StaffEntry({ onSubmit, combinedLocations, combinedActivityTypes }){
+    const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+    const [location, setLocation] = useState('');
+    const [type, setType] = useState('');
+    const [catatan, setCatatan] = useState('');
+    const [useCustomLoc, setUseCustomLoc] = useState(false);
+    const [useCustomType, setUseCustomType] = useState(false);
+
+    const submit = (e) => { e.preventDefault(); if(!date || !location || !type) return; onSubmit({ date, location, type, catatan }); setCatatan(''); setLocation(''); setType(''); };
+    const locs = combinedLocations || [];
+
+    return (
+      <form onSubmit={submit} className="bg-white p-6 rounded shadow">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div><label className="text-xs">Tarikh</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-2 border rounded" /></div>
+          <div>
+            <label className="text-xs">Lokasi</label>
+            {!useCustomLoc ? (
+              <select value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded">
+                <option value="">Pilih lokasi...</option>
+                {locs.map((l, i)=><option key={i} value={l.name}>{l.name}</option>)}
               </select>
-              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm">
-                <option value="">Semua Perkara</option>
-                {combinedActivityTypes.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="mt-4 flex justify-end"><button onClick={() => { setFilterDate(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-red-500 hover:text-red-700 underline">Kosongkan Saringan</button></div>
+            ) : <input value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip lokasi baru..." />}
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            {!isFilterActive && (<div className="bg-blue-50 px-6 py-2 text-xs text-blue-700 border-b border-blue-100 flex items-center"><Info className="w-4 h-4 mr-2" /> <span>Memaparkan rekod bulan semasa ({currentMonth}).</span></div>)}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-600">
-                <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-                  <tr><th className="px-6 py-3">Tarikh</th><th className="px-6 py-3">Lokasi</th><th className="px-6 py-3">Tujuan</th><th className="px-6 py-3">Catatan</th></tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.length > 0 ? filteredLogs.map((log) => (
-                    <tr key={log.id} className="border-b hover:bg-slate-50">
-                      <td className="px-6 py-4 font-medium">{formatDate(log.date)}</td>
-                      <td className="px-6 py-4">{log.location}</td>
-                      <td className="px-6 py-4">{log.type}</td>
-                      <td className="px-4 py-4 italic text-slate-500">{log.catatan || '-'}</td>
-                    </tr>
-                  )) : (<tr><td colSpan="4" className="px-6 py-8 text-center text-slate-400">Tiada rekod ditemui.</td></tr>)}
-                </tbody>
-              </table>
-            </div>
+          <div>
+            <label className="text-xs">Perkara</label>
+            {!useCustomType ? (
+              <select value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded">
+                <option value="">Pilih perkara...</option>
+                {combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}
+              </select>
+            ) : <input value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip perkara baru..." />}
           </div>
         </div>
-      );
-    };
 
-    const StaffReportTab = ({ logs = [] }) => {
-      const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-      const monthlyLogs = logs.filter(log => log.date && log.date.startsWith(selectedMonth));
-      return (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div><h3 className="text-lg font-bold text-slate-800">Laporan Bulanan</h3><p className="text-slate-500 text-sm">Pilih bulan untuk melihat dan memuat turun rekod.</p></div>
-            <div className="flex items-center space-x-2"><Calendar className="w-5 h-5 text-slate-400" /><input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm" /></div>
+        <div className="mt-4">
+          <label className="text-xs">Catatan</label>
+          <textarea value={catatan} onChange={e=>setCatatan(e.target.value)} rows={3} className="w-full p-2 border rounded" />
+        </div>
+
+        <div className="flex items-center gap-2 mt-4">
+          <button type="submit" className="bg-blue-900 text-white px-4 py-2 rounded flex items-center gap-2"><CheckCircle size={16}/>Hantar</button>
+          <button type="button" onClick={()=>{ setUseCustomLoc(!useCustomLoc); }} className="px-3 py-2 border rounded">Tambah Lokasi</button>
+          <button type="button" onClick={()=>{ setUseCustomType(!useCustomType); }} className="px-3 py-2 border rounded">Tambah Perkara</button>
+        </div>
+      </form>
+    );
+  }
+
+  function StaffFilter({ logs, combinedLocations, combinedActivityTypes }){
+    const [date, setDate] = useState('');
+    const [place, setPlace] = useState('');
+    const [type, setType] = useState('');
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+    const isActive = date || place || type;
+    const filtered = (logs||[]).filter(l => {
+      if(!l.date) return false;
+      if(!isActive) return l.date.startsWith(currentMonth);
+      return (date ? l.date === date : true) && (place ? l.location === place : true) && (type ? l.type === type : true);
+    });
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="p-2 border rounded" />
+            <select value={place} onChange={e=>setPlace(e.target.value)} className="p-2 border rounded">
+              <option value="">Semua Lokasi</option>
+              {combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}
+            </select>
+            <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded">
+              <option value="">Semua Perkara</option>
+              {combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}
+            </select>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button onClick={() => downloadCSV(monthlyLogs, `Log_Pergerakan_${selectedMonth}.csv`)} className="flex items-center justify-center space-x-2 bg-green-600 text-white p-4 rounded-xl"><FileSpreadsheet className="w-6 h-6" /><div className="text-left"><div className="font-bold">Muat Turun Excel (CSV)</div><div className="text-xs text-green-100">Format hamparan standard</div></div></button>
-            <button onClick={() => window.print()} className="flex items-center justify-center space-x-2 bg-slate-700 text-white p-4 rounded-xl"><Printer className="w-6 h-6" /><div className="text-left"><div className="font-bold">Cetak / Simpan PDF</div><div className="text-xs text-slate-300">Menggunakan pencetak sistem</div></div></button>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden print:shadow-none print:border-none">
-            <div className="p-4 bg-slate-50 border-b border-slate-100 font-semibold text-slate-700 flex justify-between"><span>Pratonton Laporan: {selectedMonth}</span><span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">{monthlyLogs.length} Rekod</span></div>
-            <table className="w-full text-sm text-left text-slate-600">
-              <thead className="text-xs text-slate-500 uppercase bg-slate-50">
-                <tr><th className="px-4 py-3">Tarikh</th><th className="px-4 py-3">Tempat</th><th className="px-4 py-3">Perkara</th><th className="px-4 py-3">Catatan</th></tr>
-              </thead>
+        <div className="bg-white p-4 rounded">
+          <div className="text-xs text-slate-500 mb-3">Memaparkan {filtered.length} rekod ({isActive ? 'Saringan' : 'Bulan semasa'})</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th></tr></thead>
               <tbody>
-                {monthlyLogs.map((log) => (
-                  <tr key={log.id} className="border-b">
-                    <td className="px-4 py-3">{formatDate(log.date)}</td>
-                    <td className="px-4 py-3">{log.location}</td>
-                    <td className="px-4 py-3">{log.type}</td>
-                    <td className="px-4 py-3 italic">{log.catatan || '-'}</td>
-                  </tr>
-                ))}
-                {monthlyLogs.length === 0 && (<tr><td colSpan="4" className="px-4 py-8 text-center text-slate-400">Tiada rekod untuk bulan ini.</td></tr>)}
+                {filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td></tr>)}
+                {filtered.length===0 && <tr><td colSpan="4" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
-      );
-    };
+      </div>
+    );
+  }
 
-    const StaffDashboard = ({ user, logs, onAddLog, combinedLocations, combinedActivityTypes }) => {
-      const [activeTab, setActiveTab] = useState('daftar');
-      return (
-        <div className="p-6 lg:p-10 flex-1">
-          <div className="mb-8"><h1 className="text-2xl font-bold text-slate-800">Selamat Datang, {user.name}</h1><p className="text-slate-500">{user.department}</p></div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 border-b border-slate-200 mb-6">
-            <button onClick={() => setActiveTab('daftar')} className={`pb-3 px-4 text-sm font-medium ${activeTab === 'daftar' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}><span className="flex items-center space-x-2"><Plus className="w-4 h-4" /> <span>Daftar Pergerakan</span></span></button>
-            <button onClick={() => setActiveTab('saring')} className={`pb-3 px-4 text-sm font-medium ${activeTab === 'saring' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}><span className="flex items-center space-x-2"><Filter className="w-4 h-4" /> <span>Saring Rekod</span></span></button>
-            <button onClick={() => setActiveTab('laporan')} className={`pb-3 px-4 text-sm font-medium ${activeTab === 'laporan' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}><span className="flex items-center space-x-2"><FileText className="w-4 h-4" /> <span>Laporan Bulanan</span></span></button>
-          </div>
-
-          <div className="min-h-[400px]">
-            {activeTab === 'daftar' && (<StaffEntryTab onSubmit={onAddLog} availableLocations={combinedLocations} availableTypes={combinedActivityTypes} />)}
-            {activeTab === 'saring' && <StaffFilterTab logs={logs} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
-            {activeTab === 'laporan' && <StaffReportTab logs={logs} />}
+  function StaffReport({ logs }){
+    const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
+    const monthly = (logs||[]).filter(l => l.date && l.date.startsWith(month));
+    return (
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded flex justify-between items-center">
+          <div><h3 className="font-bold">Laporan Bulanan</h3><div className="text-xs text-slate-500">Pilih bulan untuk muat turun / cetak</div></div>
+          <div className="flex items-center gap-2">
+            <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
+            <button onClick={()=>downloadCSV(monthly, `Laporan_${month}.csv`)} className="bg-green-600 text-white px-3 py-2 rounded flex items-center gap-2"><FileSpreadsheet size={16}/>CSV</button>
+            <button onClick={()=>window.print()} className="bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2"><Printer size={16}/>Cetak</button>
           </div>
         </div>
-      );
-    };
 
-    // -------------------------
-    // Admin views (data management / analysis / stats / leaderboard / report)
-    // -------------------------
-    const AdminDataManagementTab = ({ locations, activityTypes, users, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetPassword }) => {
-      const [newLocation, setNewLocation] = useState('');
-      const [newActivity, setNewActivity] = useState('');
-      const [itemToDelete, setItemToDelete] = useState(null);
-      const [locCategory, setLocCategory] = useState('Sekolah Rendah');
-      const [activeLocTab, setActiveLocTab] = useState('Sekolah Rendah');
-      const [locSearch, setLocSearch] = useState('');
-
-      const triggerDelete = (type, id, name) => setItemToDelete({ type, id, name });
-      const triggerReset = (id, name) => setItemToDelete({ type: 'reset_user', id, name });
-
-      const confirmAction = () => {
-        if (!itemToDelete) return;
-        const { type, id } = itemToDelete;
-        if (type === 'location') onDeleteLocation(id);
-        if (type === 'activity') onDeleteActivity(id);
-        if (type === 'user') onDeleteUser(id);
-        if (type === 'reset_user') onResetPassword(id);
-        setItemToDelete(null);
-      };
-
-      const sortedUsers = [...users].sort((a,b) => a.name.localeCompare(b.name));
-      const nameCounts = sortedUsers.reduce((acc, user) => { acc[user.name] = (acc[user.name] || 0) + 1; return acc; }, {});
-
-      const filteredLocations = locations.filter(loc => loc.category === activeLocTab && loc.name.toLowerCase().includes(locSearch.toLowerCase()));
-
-      return (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex flex-col h-[500px]">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center justify-between"><div className="flex items-center"><MapPin className="w-5 h-5 mr-2 text-blue-600" /> Senarai Lokasi</div></h3>
-
-              <div className="bg-slate-50 p-3 rounded-lg mb-4 space-y-2">
-                <div className="text-xs font-bold text-slate-400 uppercase">Tambah Lokasi Baru</div>
-                <div className="flex gap-2">
-                  <select value={locCategory} onChange={(e) => setLocCategory(e.target.value)} className="text-sm border border-slate-300 rounded-lg p-2 w-1/3">
-                    <option value="Sekolah Rendah">Sek. Rendah</option>
-                    <option value="Sekolah Menengah">Sek. Menengah</option>
-                    <option value="Lain-lain">Lain-lain</option>
-                  </select>
-                  <input type="text" value={newLocation} onChange={(e) => setNewLocation(e.target.value)} placeholder="Nama Lokasi..." className="flex-1 border border-slate-300 rounded-lg p-2 text-sm" />
-                  <button onClick={() => { if (newLocation) { onAddLocation({ name: newLocation, category: locCategory }); setNewLocation(''); } }} className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700"><Plus className="w-5 h-5" /></button>
-                </div>
-              </div>
-
-              <div className="flex border-b border-slate-200 mb-2">
-                <button onClick={() => setActiveLocTab('Sekolah Rendah')} className={`flex-1 pb-2 text-xs font-bold ${activeLocTab === 'Sekolah Rendah' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}>Sek. Rendah</button>
-                <button onClick={() => setActiveLocTab('Sekolah Menengah')} className={`flex-1 pb-2 text-xs font-bold ${activeLocTab === 'Sekolah Menengah' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}>Sek. Menengah</button>
-                <button onClick={() => setActiveLocTab('Lain-lain')} className={`flex-1 pb-2 text-xs font-bold ${activeLocTab === 'Lain-lain' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400'}`}>Lain-lain</button>
-              </div>
-
-              <div className="relative mb-2">
-                <input type="text" value={locSearch} onChange={(e) => setLocSearch(e.target.value)} placeholder={`Cari di ${activeLocTab}...`} className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm" />
-                <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                {filteredLocations.length > 0 ? filteredLocations.map((loc, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-white border border-slate-100 p-2 rounded text-sm hover:bg-slate-50 group">
-                    <span className="flex items-center">
-                      {loc.category === 'Sekolah Rendah' && <School className="w-3 h-3 mr-2 text-green-500" />}
-                      {loc.category === 'Sekolah Menengah' && <Building2 className="w-3 h-3 mr-2 text-orange-500" />}
-                      {loc.category === 'Lain-lain' && <HelpCircle className="w-3 h-3 mr-2 text-gray-400" />}
-                      {loc.name}
-                    </span>
-                    <button onClick={() => triggerDelete('location', locations.findIndex(l => l.name === loc.name), loc.name)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                )) : (<div className="text-center py-8 text-xs text-slate-400 italic">Tiada lokasi dijumpai.</div>)}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-[500px] flex flex-col">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><FileText className="w-5 h-5 mr-2 text-blue-600" /> Senarai Perkara (Master)</h3>
-              <div className="flex gap-2 mb-4">
-                <input type="text" value={newActivity} onChange={(e) => setNewActivity(e.target.value)} placeholder="Tambah perkara..." className="flex-1 border border-slate-300 rounded-lg p-2 text-sm" />
-                <button onClick={() => { if (newActivity) { onAddActivity(newActivity); setNewActivity(''); } }} className="bg-blue-600 text-white px-3 rounded-lg hover:bg-blue-700"><Plus className="w-5 h-5" /></button>
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {activityTypes.map((type, idx) => (
-                  <div key={idx} className="flex justify-between items-center bg-slate-50 p-2 rounded text-sm group">
-                    <span>{type}</span>
-                    <button onClick={() => triggerDelete('activity', idx, type)} className="text-slate-300 group-hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center"><Users className="w-5 h-5 mr-2 text-blue-600" /> Senarai Pengguna</h3>
-              <p className="text-xs text-slate-500 mt-1">Urus akaun pengguna. Gunakan butang Reset untuk menetapkan semula kata laluan kepada "123".</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-600">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr><th className="px-6 py-3">Nama Penuh</th><th className="px-6 py-3">ID</th><th className="px-6 py-3">Jabatan</th><th className="px-6 py-3 text-right">Tindakan</th></tr>
-                </thead>
-                <tbody>
-                  {sortedUsers.map(user => {
-                    const isDuplicate = nameCounts[user.name] > 1;
-                    return (
-                      <tr key={user.id} className={`border-b ${isDuplicate ? 'bg-pink-50' : 'hover:bg-slate-50'}`}>
-                        <td className="px-6 py-4 font-medium text-slate-900 flex items-center">{user.name}{isDuplicate && <span className="ml-2 text-pink-600"><AlertTriangle className="w-4 h-4" /></span>}</td>
-                        <td className="px-6 py-4">{user.username}</td>
-                        <td className="px-6 py-4">{user.department}</td>
-                        <td className="px-6 py-4 text-right flex justify-end space-x-2">
-                          <button onClick={() => triggerReset(user.id, user.name)} className="text-orange-500 hover:text-orange-700 bg-orange-50 p-2 rounded-lg text-xs font-medium"><RefreshCw className="w-4 h-4 mr-1" /> Reset Pass</button>
-                          {user.role !== 'admin' && (<button onClick={() => triggerDelete('user', user.id, user.name)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg"><Trash2 className="w-4 h-4" /></button>)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <DeleteConfirmationModal isOpen={!!itemToDelete} onClose={() => setItemToDelete(null)} onConfirm={confirmAction} itemName={itemToDelete?.name} isResetPassword={itemToDelete?.type === 'reset_user'} />
-        </div>
-      );
-    };
-
-    const AdminAnalysisTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes, onDeleteLog }) => {
-      const [filterMonth, setFilterMonth] = useState('');
-      const [filterStaff, setFilterStaff] = useState('');
-      const [filterPlace, setFilterPlace] = useState('');
-      const [filterType, setFilterType] = useState('');
-
-      const filteredLogs = logs.filter(log => {
-        if (!log.date) return false;
-        const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true;
-        const matchStaff = filterStaff ? log.userName === filterStaff : true;
-        const matchPlace = filterPlace ? log.location === filterPlace : true;
-        const matchType = filterType ? log.type === filterType : true;
-        return matchMonth && matchStaff && matchPlace && matchType;
-      });
-
-      const [logToDelete, setLogToDelete] = useState(null);
-
-      return (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring Rekod (Slicers)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm" /></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Staf</option>{allUsers.map((u, i) => <option key={i} value={u}>{u}</option>)}</select></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Lokasi</option>{combinedLocations.map(loc => <option key={loc.name} value={loc.name}>{loc.name}</option>)}</select></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}</select></div>
-            </div>
-            <div className="mt-4 flex justify-between items-center pt-2 border-t border-slate-50">
-              <span className="text-sm text-slate-500">Jumlah Rekod: <strong>{filteredLogs.length}</strong></span>
-              <button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600">Kosongkan Semua</button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left text-slate-600">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr><th className="px-6 py-3">Tarikh</th><th className="px-6 py-3">Nama</th><th className="px-6 py-3">Lokasi</th><th className="px-6 py-3">Perkara</th><th className="px-6 py-3 text-right">Tindakan</th></tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                    <tr key={log.id} className="border-b hover:bg-slate-50">
-                      <td className="px-6 py-4">{formatDate(log.date)}</td>
-                      <td className="px-6 py-4 font-bold text-slate-800">{log.userName}</td>
-                      <td className="px-6 py-4">{log.location}</td>
-                      <td className="px-6 py-4">{log.type}</td>
-                      <td className="px-6 py-4 text-right">
-                        <button onClick={() => setLogToDelete(log)} className="text-slate-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                      </td>
-                    </tr>
-                  )) : (<tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">Tiada rekod ditemui dengan saringan ini.</td></tr>)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {logToDelete && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-red-100">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Trash2 className="w-8 h-8 text-red-600" />
-                  </div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">Padam Rekod?</h3>
-                  <p className="text-slate-600 mb-6 text-sm">
-                    Tarikh: {formatDate(logToDelete.date)} <br />
-                    Oleh: {logToDelete.userName}
-                    <br /><span className="text-xs text-red-500 mt-2 block">Tindakan ini tidak boleh dikembalikan.</span>
-                  </p>
-                  <div className="flex space-x-3">
-                    <button onClick={() => setLogToDelete(null)} className="flex-1 bg-slate-100 py-2.5 rounded-lg">Batal</button>
-                    <button onClick={() => { onDeleteLog(logToDelete.id); setLogToDelete(null); }} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg">Padam</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    };
-
-    const AdminStatsTab = ({ logs, allUsers, combinedLocations, combinedActivityTypes }) => {
-      const [filterMonth, setFilterMonth] = useState('');
-      const [filterStaff, setFilterStaff] = useState('');
-      const [filterPlace, setFilterPlace] = useState('');
-      const [filterType, setFilterType] = useState('');
-
-      const filteredLogs = logs.filter(log => {
-        if (!log.date) return false;
-        const matchMonth = filterMonth ? log.date.startsWith(filterMonth) : true;
-        const matchStaff = filterStaff ? log.userName === filterStaff : true;
-        const matchPlace = filterPlace ? log.location === filterPlace : true;
-        const matchType = filterType ? log.type === filterType : true;
-        return matchMonth && matchStaff && matchPlace && matchType;
-      });
-
-      const getChartData = (key) => {
-        const counts = filteredLogs.reduce((acc, log) => {
-          const val = log[key] || 'Lain-lain';
-          acc[val] = (acc[val] || 0) + 1;
-          return acc;
-        }, {});
-        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
-        return Object.keys(counts).map((label, i) => ({ label, value: counts[label], color: colors[i % colors.length] })).sort((a,b) => b.value - a.value);
-      };
-
-      return (
-        <div className="space-y-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Filter className="w-5 h-5 mr-2 text-blue-600" /> Saringan Data Statistik</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e)=>setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm" /></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e)=>setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Staf</option>{allUsers.map((u,i)=><option key={i} value={u}>{u}</option>)}</select></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e)=>setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Lokasi</option>{combinedLocations.map(loc => <option key={loc.name} value={loc.name}>{loc.name}</option>)}</select></div>
-              <div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e)=>setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Perkara</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select></div>
-            </div>
-            <div className="mt-4 flex justify-end"><button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600">Reset Saringan</button></div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h4 className="font-bold text-slate-800 text-center mb-6 border-b pb-2">Peratus Mengikut Perkara</h4><div className="flex items-center justify-center"><ConicPieChart data={getChartData('type')} /></div></div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h4 className="font-bold text-slate-800 text-center mb-6 border-b pb-2">Peratus Mengikut Tempat</h4><div className="flex items-center justify-center"><ConicPieChart data={getChartData('location')} /></div></div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h4 className="font-bold text-slate-800 text-center mb-6 border-b pb-2">Peratus Mengikut Staf</h4><div className="flex items-center justify-center"><ConicPieChart data={getChartData('userName')} totalLabel="Staf Aktif" /></div></div>
-          </div>
-        </div>
-      );
-    };
-
-    const AdminLeaderboardTab = ({ logs }) => {
-      const totalEntries = logs.reduce((acc, log) => { acc[log.userName] = (acc[log.userName] || 0) + 1; return acc; }, {});
-      const sortedTotal = Object.entries(totalEntries).sort((a,b) => b[1] - a[1]).map(([name, count], i) => ({ rank: i + 1, name, count }));
-      const coachingLogs = logs.filter(log => {
-        const text = (log.type + ' ' + (log.catatan || '')).toLowerCase();
-        return text.includes('bimbingan') || text.includes('coaching') || text.includes('mentoring');
-      });
-      const coachingEntries = coachingLogs.reduce((acc, log) => { acc[log.userName] = (acc[log.userName] || 0) + 1; return acc; }, {});
-      const sortedCoaching = Object.entries(coachingEntries).sort((a,b) => b[1] - a[1]).map(([name, count], i) => ({ rank: i + 1, name, count }));
-
-      const RankTable = ({ title, data, icon: Icon, color }) => (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden h-full">
-          <div className={`p-4 ${color} text-white font-bold flex items-center`}><Icon className="w-5 h-5 mr-2" /> {title}</div>
-          <table className="w-full text-sm text-left text-slate-600">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-6 py-3 w-16">#</th><th className="px-6 py-3">Nama Pegawai</th><th className="px-6 py-3 text-right">Jumlah</th></tr></thead>
+        <div className="bg-white p-4 rounded">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead>
             <tbody>
-              {data.length > 0 ? data.map(item => (
-                <tr key={item.name} className="border-b hover:bg-slate-50">
-                  <td className="px-6 py-4 font-bold text-slate-400">{item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : item.rank}</td>
-                  <td className="px-6 py-4 font-medium text-slate-900">{item.name}</td>
-                  <td className="px-6 py-4 text-right font-bold text-blue-900">{item.count}</td>
-                </tr>
-              )) : (<tr><td colSpan="3" className="px-6 py-8 text-center text-slate-400">Tiada data direkodkan.</td></tr>)}
+              {monthly.map(l => <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}
+              {monthly.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
             </tbody>
           </table>
         </div>
-      );
+      </div>
+    );
+  }
 
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <RankTable title="Ranking Pengisian Terbanyak" data={sortedTotal} icon={Trophy} color="bg-blue-600" />
-          <RankTable title="Ranking Coaching & Mentoring" data={sortedCoaching} icon={TrendingUp} color="bg-green-600" />
+  // ---------- Admin area ----------
+  function AdminArea({ user, logs, users, locations, activityTypes, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onAddUser, onDeleteUser, onResetUserPassword, onDeleteLog, combinedLocations, combinedActivityTypes, allUserNames }){
+    const [tab, setTab] = useState('data');
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">Dashboard Pentadbir</h2>
+          <div className="text-sm text-slate-500">{user.name}</div>
         </div>
-      );
-    };
 
-    const AdminReportTab = ({ logs, allUsers = [], combinedLocations = [], combinedActivityTypes = [] }) => {
-      const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0,7));
-      const [filterStaff, setFilterStaff] = useState('');
-      const [filterPlace, setFilterPlace] = useState('');
-      const [filterType, setFilterType] = useState('');
+        <div className="flex gap-2 mb-6">
+          <button onClick={()=>setTab('data')} className={tab==='data' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Urus Data</button>
+          <button onClick={()=>setTab('analisis')} className={tab==='analisis' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Analisis</button>
+          <button onClick={()=>setTab('reports')} className={tab==='reports' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Laporan</button>
+        </div>
 
-      const filtered = logs.filter(log => {
-        if (!log.date) return false;
-        const matchMonth = log.date.startsWith(selectedMonth);
-        const matchStaff = filterStaff ? log.userName === filterStaff : true;
-        const matchPlace = filterPlace ? log.location === filterPlace : true;
-        const matchType = filterType ? log.type === filterType : true;
-        return matchMonth && matchStaff && matchPlace && matchType;
-      });
+        {tab==='data' && <AdminData users={users} locations={locations} activityTypes={activityTypes} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onAddUser={onAddUser} onDeleteUser={onDeleteUser} onResetUserPassword={onResetUserPassword} />}
+        {tab==='analisis' && <AdminAnalysis logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
+        {tab==='reports' && <AdminReport logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+      </div>
+    );
+  }
 
-      return (
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-slate-800">Laporan Bulanan (Pentadbir)</h3>
-                <p className="text-xs text-slate-500">Pilih bulan dan saring untuk pratonton / muat turun.</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm" />
-              </div>
+  function AdminData({ users, locations, activityTypes, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onAddUser, onDeleteUser, onResetUserPassword }){
+    const [locName, setLocName] = useState(''); const [locCat, setLocCat] = useState('Lain-lain');
+    const [actName, setActName] = useState('');
+    const [uUsername, setUUsername] = useState(''); const [uPassword, setUPassword] = useState(''); const [uName, setUName] = useState(''); const [uDept, setUDept] = useState('');
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded">
+            <h4 className="font-bold mb-2">Lokasi</h4>
+            <div className="flex gap-2 mb-3">
+              <select value={locCat} onChange={e=>setLocCat(e.target.value)} className="p-2 border rounded">
+                <option>Sekolah Rendah</option><option>Sekolah Menengah</option><option>Lain-lain</option>
+              </select>
+              <input value={locName} onChange={e=>setLocName(e.target.value)} placeholder="Nama lokasi" className="p-2 border rounded flex-1" />
+              <button onClick={()=>{ if(locName) { onAddLocation({ name: locName, category: locCat }); setLocName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><Plus/> Tambah</button>
             </div>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <select value={filterStaff} onChange={e => setFilterStaff(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Staf</option>{allUsers.map((u,i)=><option key={i} value={u}>{u}</option>)}</select>
-              <select value={filterPlace} onChange={e => setFilterPlace(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Lokasi</option>{combinedLocations.map(loc => <option key={loc.name} value={loc.name}>{loc.name}</option>)}</select>
-              <select value={filterType} onChange={e => setFilterType(e.target.value)} className="border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Perkara</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>
-            </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              <button onClick={() => { setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600">Reset</button>
-              <button onClick={() => downloadCSV(filtered, `Laporan_Admin_${selectedMonth}.csv`)} className="bg-green-600 text-white px-3 py-2 rounded">Muat Turun CSV</button>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {locations.map(l => <div key={l.docId} className="flex justify-between items-center p-2 border rounded"><div><div className="font-medium">{l.name}</div><div className="text-xs text-slate-500">{l.category}</div></div><button onClick={()=>onDeleteLocation(l.docId)} className="text-red-500"><Trash2/></button></div>)}
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
-            <table className="w-full text-sm text-left text-slate-600">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                <tr><th className="px-4 py-3">Tarikh</th><th className="px-4 py-3">Nama</th><th className="px-4 py-3">Lokasi</th><th className="px-4 py-3">Perkara</th><th className="px-4 py-3">Catatan</th></tr>
-              </thead>
+          <div className="bg-white p-4 rounded">
+            <h4 className="font-bold mb-2">Perkara (Activity Types)</h4>
+            <div className="flex gap-2 mb-3">
+              <input value={actName} onChange={e=>setActName(e.target.value)} placeholder="Perkara baru" className="p-2 border rounded flex-1" />
+              <button onClick={()=>{ if(actName) { onAddActivity(actName); setActName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><Plus/> Tambah</button>
+            </div>
+            <div className="space-y-1">
+              {activityTypes.map(t => <div key={t.docId} className="flex justify-between items-center p-2 border rounded"><div>{t.name}</div><button onClick={()=>onDeleteActivity(t.docId)} className="text-red-500"><Trash2/></button></div>)}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded">
+          <h4 className="font-bold mb-2">Pengguna</h4>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
+            <input value={uUsername} onChange={e=>setUUsername(e.target.value)} placeholder="ID Pengguna" className="p-2 border rounded" />
+            <input value={uPassword} onChange={e=>setUPassword(e.target.value)} placeholder="Kata Laluan" className="p-2 border rounded" />
+            <input value={uName} onChange={e=>setUName(e.target.value)} placeholder="Nama Penuh" className="p-2 border rounded" />
+            <input value={uDept} onChange={e=>setUDept(e.target.value)} placeholder="Jabatan" className="p-2 border rounded" />
+          </div>
+          <div className="flex gap-2 mb-4">
+            <button onClick={()=>{ if(uUsername && uPassword && uName) { onAddUser({ username: uUsername, password: uPassword, role: 'staff', name: uName, department: uDept }); setUUsername(''); setUPassword(''); setUName(''); setUDept(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Tambah Pengguna</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-slate-500"><tr><th className="p-2">Nama</th><th className="p-2">ID</th><th className="p-2">Jabatan</th><th className="p-2">Tindakan</th></tr></thead>
               <tbody>
-                {filtered.map(log => (<tr key={log.id} className="border-b"><td className="px-4 py-3">{formatDate(log.date)}</td><td className="px-4 py-3 font-bold">{log.userName}</td><td className="px-4 py-3">{log.location}</td><td className="px-4 py-3">{log.type}</td><td className="px-4 py-3 italic">{log.catatan || '-'}</td></tr>))}
-                {filtered.length === 0 && (<tr><td colSpan="5" className="px-4 py-8 text-center text-slate-400">Tiada rekod untuk pilihan ini.</td></tr>)}
+                {users.map(u => <tr key={u.docId} className="border-t"><td className="p-2 font-medium">{u.name}</td><td className="p-2">{u.username}</td><td className="p-2">{u.department}</td><td className="p-2"><button onClick={()=>onResetUserPassword(u.docId)} className="text-orange-600 mr-2">Reset</button>{u.role!=='admin' && <button onClick={()=>onDeleteUser(u.docId)} className="text-red-600">Padam</button>}</td></tr>)}
               </tbody>
             </table>
           </div>
         </div>
-      );
-    };
+      </div>
+    );
+  }
 
-    const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetPassword, onDeleteLog, allUsers, combinedLocations, combinedActivityTypes }) => {
-      const [activeTab, setActiveTab] = useState('data');
+  function AdminAnalysis({ logs, allUserNames, combinedLocations, combinedActivityTypes, onDeleteLog }){
+    const [month, setMonth] = useState('');
+    const [staff, setStaff] = useState('');
+    const [place, setPlace] = useState('');
+    const [type, setType] = useState('');
 
-      return (
-        <div className="p-6 lg:p-10 flex-1">
-          <div className="mb-8"><h1 className="text-2xl font-bold text-slate-800">Dashboard Pentadbir</h1><p className="text-slate-500">{user.name}</p></div>
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 border-b border-slate-200 mb-6">
-            <button onClick={() => setActiveTab('data')} className={`pb-3 px-4 ${activeTab==='data' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>1. Data</button>
-            <button onClick={() => setActiveTab('analisis')} className={`pb-3 px-4 ${activeTab==='analisis' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>2. Analisis</button>
-            <button onClick={() => setActiveTab('stats')} className={`pb-3 px-4 ${activeTab==='stats' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>3. Statistik</button>
-            <button onClick={() => setActiveTab('leaderboard')} className={`pb-3 px-4 ${activeTab==='leaderboard' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>4. Leaderboard</button>
-            <button onClick={() => setActiveTab('laporan')} className={`pb-3 px-4 ${activeTab==='laporan' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>5. Laporan Bulanan</button>
+    const filtered = (logs||[]).filter(l => {
+      if(!l.date) return false;
+      return (month ? l.date.startsWith(month) : true) && (staff ? l.userName===staff : true) && (place ? l.location===place : true) && (type ? l.type===type : true);
+    });
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
+          <select value={staff} onChange={e=>setStaff(e.target.value)} className="p-2 border rounded"><option value="">Semua Staf</option>{allUserNames.map((n,i)=><option key={i} value={n}>{n}</option>)}</select>
+          <select value={place} onChange={e=>setPlace(e.target.value)} className="p-2 border rounded"><option value="">Semua Lokasi</option>{combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}</select>
+          <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded"><option value="">Semua Perkara</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>
+        </div>
+
+        <div className="bg-white p-4 rounded overflow-x-auto">
+          <div className="text-sm text-slate-500 mb-2">Jumlah rekod: <strong>{filtered.length}</strong></div>
+          <table className="w-full text-sm">
+            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Tindakan</th></tr></thead>
+            <tbody>
+              {filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2"><button onClick={()=>onDeleteLog(l.docId)} className="text-red-600">Padam</button></td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  function AdminReport({ logs, allUserNames, combinedLocations, combinedActivityTypes }){
+    const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
+    const [staff, setStaff] = useState(''); const [place, setPlace] = useState(''); const [type, setType] = useState('');
+
+    const filtered = (logs||[]).filter(l => l.date && l.date.startsWith(month) && (staff ? l.userName===staff : true) && (place ? l.location===place : true) && (type ? l.type===type : true));
+    return (
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded flex justify-between items-center">
+          <div>
+            <h4 className="font-bold">Laporan Bulanan (Pentadbir)</h4>
+            <div className="text-xs text-slate-500">Pilih bulan dan saring</div>
           </div>
-
-          <div className="min-h-[500px]">
-            {activeTab === 'data' && <AdminDataManagementTab locations={data.locations} activityTypes={data.activityTypes} users={data.users} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onDeleteUser={onDeleteUser} onResetPassword={onResetPassword} />}
-            {activeTab === 'analisis' && <AdminAnalysisTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
-            {activeTab === 'stats' && <AdminStatsTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
-            {activeTab === 'leaderboard' && <AdminLeaderboardTab logs={logs} />}
-            {activeTab === 'laporan' && <AdminReportTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+          <div className="flex items-center gap-2">
+            <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
+            <select value={staff} onChange={e=>setStaff(e.target.value)} className="p-2 border rounded"><option value="">Semua Staf</option>{allUserNames.map((n,i)=><option key={i} value={n}>{n}</option>)}</select>
+            <button onClick={()=>downloadCSV(filtered, `Laporan_Admin_${month}.csv`)} className="bg-green-600 text-white px-3 py-2 rounded">Muat Turun CSV</button>
           </div>
         </div>
-      );
-    };
 
-    // -------------------------
-    // Root App
-    // -------------------------
-    function App() {
-      const [user, setUser] = useState(null);
-      const [error, setError] = useState('');
-      const [successMsg, setSuccessMsg] = useState('');
-      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-      const [showSuccessModal, setShowSuccessModal] = useState(false);
-      const [data, setData] = useState(INITIAL_DATA);
-
-      // Auth handlers
-      const handleLogin = (username, password, role) => {
-        const found = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-        if (found) {
-          setUser(found);
-          setError('');
-          setSuccessMsg('');
-        } else {
-          setError('ID Pengguna atau Kata Laluan tidak sah.');
-        }
-      };
-
-      const handleRegister = (newUser) => {
-        const id = data.users.length + 1;
-        const userEntry = { ...newUser, id };
-        setData(prev => ({ ...prev, users: [...prev.users, userEntry] }));
-        setSuccessMsg('Pendaftaran berjaya! Sila log masuk.');
-        setError('');
-      };
-
-      const handleLogout = () => {
-        setUser(null);
-        setIsMobileMenuOpen(false);
-        setSuccessMsg('');
-        setError('');
-      };
-
-      // Data handlers
-      const handleAddLog = (newLogData) => {
-        const newLog = { id: Date.now(), userId: user.id, userName: user.name, ...newLogData };
-        setData(prev => {
-          const locationExists = prev.locations.some(loc => loc.name === newLogData.location);
-          let updatedLocations = prev.locations;
-          if (!locationExists && newLogData.location) {
-            updatedLocations = [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
-          }
-          return {
-            ...prev,
-            logs: [newLog, ...prev.logs],
-            locations: updatedLocations
-          };
-        });
-        setShowSuccessModal(true);
-      };
-
-      const handleDeleteLog = (logId) => setData(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== logId) }));
-      const handleResetPassword = (userId) => setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) }));
-
-      // Admin handlers
-      const handleAddLocation = (newLoc) => setData(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
-      const handleDeleteLocation = (index) => setData(prev => ({ ...prev, locations: prev.locations.filter((_, i) => i !== index) }));
-      const handleAddActivity = (newActivity) => setData(prev => ({ ...prev, activityTypes: [...prev.activityTypes, newActivity] }));
-      const handleDeleteActivity = (index) => setData(prev => ({ ...prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
-      const handleDeleteUser = (userId) => setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
-
-      const combinedLocations = useMemo(() => {
-        const masterLocs = data.locations;
-        const logLocs = data.logs.map(l => l.location).filter(Boolean).filter(logLocName => !masterLocs.some(ml => ml.name === logLocName));
-        const customLocObjects = Array.from(new Set(logLocs)).map(name => ({ name, category: 'Lain-lain' }));
-        return [...masterLocs, ...customLocObjects].sort((a,b) => a.name.localeCompare(b.name));
-      }, [data.logs, data.locations]);
-
-      const combinedActivityTypes = useMemo(() => {
-        const logTypes = data.logs.map(l => l.type).filter(Boolean);
-        return Array.from(new Set([...data.activityTypes, ...logTypes])).sort();
-      }, [data.logs, data.activityTypes]);
-
-      const allUsers = useMemo(() => {
-        const logUserNames = data.logs.map(l => l.userName);
-        const registeredUserNames = data.users.map(u => u.name);
-        return Array.from(new Set([...registeredUserNames, ...logUserNames])).sort();
-      }, [data.logs, data.users]);
-
-      const relevantLogs = user ? (user.role === 'admin' ? data.logs : data.logs.filter(log => log.userId === user.id)) : [];
-
-      if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} setError={setError} successMsg={successMsg} />;
-
-      return (
-        <div className="min-h-screen bg-slate-50 flex font-sans">
-          <ErrorBoundary>
-            <PWASetup />
-            <aside className="hidden md:flex flex-col w-64 bg-blue-900 text-white fixed h-full z-10 print:hidden">
-              <div className="p-6 flex items-center space-x-3 border-b border-blue-800"><div className="bg-white p-1 rounded-full"><MapPin className="w-6 h-6 text-blue-900" /></div><span className="font-bold text-lg tracking-wide">E-Gerak</span></div>
-              <div className="flex-1 p-4">
-                <div className="p-4 bg-blue-800 rounded-xl mb-4">
-                  <p className="text-xs text-blue-300 uppercase tracking-wider mb-1">Akaun</p>
-                  <p className="font-bold truncate">{user.name}</p>
-                  <p className="text-xs text-blue-200">{user.role === 'admin' ? 'Pentadbir Sistem' : 'Pegawai / Staf'}</p>
-                </div>
-              </div>
-              <div className="p-4 border-t border-blue-800">
-                <button onClick={handleLogout} className="w-full bg-red-600 text-white py-2 rounded-lg flex items-center justify-center space-x-2"><LogOut className="w-4 h-4" /><span>Log Keluar</span></button>
-              </div>
-            </aside>
-
-            <main className="flex-1 md:ml-64">
-              <div className="bg-white p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2 bg-slate-100 rounded-lg"><Menu className="w-5 h-5" /></button>
-                  <div>
-                    <h2 className="text-lg font-bold">E-Gerak</h2>
-                    <p className="text-xs text-slate-500">PPD Ranau</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button onClick={() => setShowSuccessModal(true)} className="hidden sm:inline-flex items-center space-x-2 bg-blue-50 text-blue-800 px-3 py-1 rounded">Demo Modal</button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                {user.role === 'staff' ? (
-                  <StaffDashboard user={user} logs={relevantLogs} onAddLog={handleAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
-                ) : (
-                  <AdminDashboard user={user} logs={relevantLogs} data={data}
-                    onAddLocation={handleAddLocation} onDeleteLocation={handleDeleteLocation}
-                    onAddActivity={handleAddActivity} onDeleteActivity={handleDeleteActivity}
-                    onDeleteUser={handleDeleteUser} onResetPassword={handleResetPassword}
-                    onDeleteLog={handleDeleteLog}
-                    allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
-                )}
-              </div>
-
-              <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} message="Laporan telah dihantar." />
-            </main>
-          </ErrorBoundary>
+        <div className="bg-white p-4 rounded overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead>
+            <tbody>
+              {filtered.map(l => <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}
+              {filtered.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
+            </tbody>
+          </table>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+  // ---------- Render ----------
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App/>);
 
   </script>
 </body>
