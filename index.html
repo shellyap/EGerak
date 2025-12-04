@@ -261,7 +261,8 @@
     static getDerivedStateFromError(err){ return { hasError:true, err }; }
     render(){ if(this.state.hasError) return <div className="p-6 bg-red-50 text-red-700 rounded">{String(this.state.err)}</div>; return this.props.children; }
   }
-   <script type="text/babel">
+
+    <script type="text/babel">
   // ---------- App ----------
   function App(){
     const [user,setUser] = useState(null);
@@ -508,8 +509,6 @@
       }
     }, [category, searchText, lainlainLocations]);
 
- 
-  </script>
   <script type="text/babel">
     // Continue StaffEntry component
     const submit = (e) => {
@@ -747,9 +746,7 @@
     );
   }
 
- 
-  </script>
-   <script type="text/babel">
+    <script type="text/babel">
 
   // ---------- Admin Area ----------
   function AdminArea({
@@ -1182,10 +1179,7 @@
       </div>
     );
   }
-
-  
-  </script>
-    <script type="text/babel">
+<script type="text/babel">
 
   // ======================================================
   //                 GLOBAL HELPER FUNCTIONS
@@ -1330,7 +1324,7 @@
   root.render(<AppRoot />);
 
   </script>
-    <script type="text/babel">
+<script type="text/babel">
 
   // ======================================================
   //        FIXED SEKOLAH RENDAH (72 ITEMS) — AUTO SUGGEST
@@ -1440,7 +1434,7 @@
 
 </body>
 </html>
-
+ 
 
 
 
