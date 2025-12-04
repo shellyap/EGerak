@@ -52,28 +52,59 @@
         measurementId: "G-V6CGGJ81JG"
       };
       firebase.initializeApp(firebaseConfig);
-
-  // *** FIX MODE 2 : EDGE REALTIME SYNC PATCH ***
-  try {
-    firebase.firestore().disableNetwork(); 
-    firebase.firestore().enableNetwork();
-  } catch(e){}
-
-  firebase.firestore().settings({
-    experimentalForceLongPolling: true,
-    experimentalAutoDetectLongPolling: false,
-    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-  });
-
-  // Prevent Edge storage blocking from breaking Firestore
-  try { db._firestoreClient._persistenceKey = "edge-no-persistence"; } catch(e){}
-
       if (typeof firebase.analytics === 'function') firebase.analytics();
       console.log('Firebase initialized (compat).');
     } catch (e) {
       console.warn('Firebase init warning:', e);
     }
   </script>
+
+<!-- GLOBAL Firestore real-time listeners (edge-safe) -->
+<script>
+  (function(){
+    try {
+      if (!window.firebase || !firebase.firestore) return;
+      const db = firebase.firestore();
+      try {
+        db.settings({
+          experimentalForceLongPolling: true,
+          experimentalAutoDetectLongPolling: false,
+          cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+        });
+      } catch(e){ /* ignore */ }
+
+      let remoteState = { users: [], logs: [], locations: [], activityTypes: [] };
+
+      const emit = () => {
+        window.dispatchEvent(new CustomEvent('firestoreRemoteUpdate', { detail: remoteState }));
+      };
+
+      const docsToArray = (snap) => (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+
+      try {
+        db.collection('users').onSnapshot(snap => { remoteState.users = docsToArray(snap); emit(); }, err => console.warn('users onSnapshot error', err));
+      } catch(e){ console.warn('users listener skip', e); }
+
+      try {
+        db.collection('logs').orderBy('date','desc').onSnapshot(snap => { remoteState.logs = docsToArray(snap); emit(); }, err => console.warn('logs onSnapshot error', err));
+      } catch(e){ console.warn('logs listener skip', e); }
+
+      try {
+        db.collection('locations').onSnapshot(snap => { remoteState.locations = docsToArray(snap); emit(); }, err => console.warn('locations onSnapshot error', err));
+      } catch(e){ console.warn('locations listener skip', e); }
+
+      try {
+        db.collection('activityTypes').onSnapshot(snap => { remoteState.activityTypes = docsToArray(snap).map(d => d.name || d.value || d.id); emit(); }, err => console.warn('activityTypes onSnapshot error', err));
+      } catch(e){ console.warn('activityTypes listener skip', e); }
+
+      window.__EG_DB = db;
+      console.log('Global Firestore listeners active (if Firestore available).');
+    } catch (e) {
+      console.warn('Global Firestore listener setup failed:', e);
+    }
+  })();
+</script>
+
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div id="root"></div>
@@ -1039,7 +1070,35 @@
       const [successMsg, setSuccessMsg] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [showSuccessModal, setShowSuccessModal] = useState(false);
-      const [data, setData] = useState(INITIAL_DATA);
+      const [data, setData] = useState(INITIAL_DATA)
+
+      // Listen for global Firestore updates and merge into local state
+      useEffect(() => {
+        const handler = (e) => {
+          const remote = e.detail || {};
+          if (!remote) return;
+          setData(prev => {
+            const merged = { ...prev };
+            if (Array.isArray(remote.users) && remote.users.length) {
+              merged.users = remote.users.map(u => ({ id: u.id || u.username || Date.now(), username: u.username || u.id, password: u.password || '123', role: u.role || 'staff', name: u.name || u.username || 'Unknown', department: u.department || '' }));
+            }
+            if (Array.isArray(remote.logs) && remote.logs.length) {
+              merged.logs = remote.logs.map(l => ({ id: l.id || Date.now(), userId: l.userId || null, userName: l.userName || l.user || 'Unknown', type: l.type || '', location: l.location || '', date: l.date || (new Date()).toISOString().split('T')[0], catatan: l.catatan || '' }));
+            }
+            if (Array.isArray(remote.locations) && remote.locations.length) {
+              merged.locations = remote.locations.map(loc => ({ name: loc.name || loc.id || loc, category: loc.category || 'Lain-lain' }));
+            }
+            if (Array.isArray(remote.activityTypes) && remote.activityTypes.length) {
+              merged.activityTypes = remote.activityTypes;
+            }
+            return merged;
+          });
+        };
+        window.addEventListener('firestoreRemoteUpdate', handler);
+        return () => window.removeEventListener('firestoreRemoteUpdate', handler);
+      }, []);
+
+;
 
       // Auth handlers
       const handleLogin = (username, password, role) => {
@@ -1068,35 +1127,118 @@
         setError('');
       };
 
-      // Data handlers
+      
+      // Data handlers (patched to sync with Firestore if available)
+      const writeToFirestore = (collection, doc) => {
+        try {
+          if (window.__EG_DB) {
+            return window.__EG_DB.collection(collection).add(doc);
+          }
+        } catch (e) { console.warn('Firestore write failed', e); }
+        return Promise.reject('no-firestore');
+      };
+
       const handleAddLog = (newLogData) => {
-        const newLog = { id: Date.now(), userId: user.id, userName: user.name, ...newLogData };
+        const payload = {
+          userId: user.id,
+          userName: user.name,
+          date: newLogData.date || (new Date()).toISOString().split('T')[0],
+          location: newLogData.location || '',
+          type: newLogData.type || '',
+          catatan: newLogData.catatan || '',
+          createdAt: (firebase && firebase.firestore) ? firebase.firestore.FieldValue.serverTimestamp() : (new Date()).toISOString()
+        };
+
+        if (window.__EG_DB) {
+          writeToFirestore('logs', payload).then(() => {
+            setShowSuccessModal(true);
+          }).catch(() => {
+            const newLog = { id: Date.now(), ...payload };
+            setData(prev => {
+              const locationExists = prev.locations.some(loc => loc.name === newLogData.location);
+              const updatedLocations = locationExists ? prev.locations : [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
+              return { ...prev, logs: [newLog, ...prev.logs], locations: updatedLocations };
+            });
+            setShowSuccessModal(true);
+          });
+          return;
+        }
+
+        const newLog = { id: Date.now(), ...payload };
         setData(prev => {
           const locationExists = prev.locations.some(loc => loc.name === newLogData.location);
-          let updatedLocations = prev.locations;
-          if (!locationExists && newLogData.location) {
-            updatedLocations = [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
-          }
-          return {
-            ...prev,
-            logs: [newLog, ...prev.logs],
-            locations: updatedLocations
-          };
+          const updatedLocations = locationExists ? prev.locations : [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
+          return { ...prev, logs: [newLog, ...prev.logs], locations: updatedLocations };
         });
         setShowSuccessModal(true);
       };
 
-      const handleDeleteLog = (logId) => setData(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== logId) }));
-      const handleResetPassword = (userId) => setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) }));
+      const handleDeleteLog = (logId) => {
+        if (window.__EG_DB) {
+          window.__EG_DB.collection('logs').where('id','==', logId).get().then(snap => {
+            snap.forEach(doc => doc.ref.delete());
+          }).catch(()=>{
+            try { window.__EG_DB.collection('logs').doc(String(logId)).delete().catch(()=>{}); } catch(e) {}
+          });
+          return;
+        }
+        setData(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== logId) }));
+      };
 
-      // Admin handlers
-      const handleAddLocation = (newLoc) => setData(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
-      const handleDeleteLocation = (index) => setData(prev => ({ ...prev, locations: prev.locations.filter((_, i) => i !== index) }));
-      const handleAddActivity = (newActivity) => setData(prev => ({ ...prev, activityTypes: [...prev.activityTypes, newActivity] }));
-      const handleDeleteActivity = (index) => setData(prev => ({ ...prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
-      const handleDeleteUser = (userId) => setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
+      const handleResetPassword = (userId) => {
+        if (window.__EG_DB) {
+          window.__EG_DB.collection('users').where('id','==', userId).get().then(snap => {
+            snap.forEach(doc => doc.ref.update({ password: '123' }));
+          }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) }));
+      };
 
-      const combinedLocations = useMemo(() => {
+      const handleAddLocation = (newLoc) => {
+        if (window.__EG_DB) {
+          writeToFirestore('locations', { name: newLoc.name || newLoc, category: newLoc.category || 'Lain-lain' }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
+      };
+
+      const handleDeleteLocation = (index) => {
+        if (window.__EG_DB) {
+          const name = data.locations[index] && data.locations[index].name;
+          if (!name) return;
+          window.__EG_DB.collection('locations').where('name','==', name).get().then(snap => { snap.forEach(doc => doc.ref.delete()); }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, locations: prev.locations.filter((_, i) => i !== index) }));
+      };
+
+      const handleAddActivity = (newActivity) => {
+        if (window.__EG_DB) {
+          writeToFirestore('activityTypes', { name: newActivity }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, activityTypes: [...prev.activityTypes, newActivity] }));
+      };
+
+      const handleDeleteActivity = (index) => {
+        if (window.__EG_DB) {
+          const name = data.activityTypes[index];
+          if (!name) return;
+          window.__EG_DB.collection('activityTypes').where('name','==', name).get().then(snap => { snap.forEach(doc => doc.ref.delete()); }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
+      };
+
+      const handleDeleteUser = (userId) => {
+        if (window.__EG_DB) {
+          window.__EG_DB.collection('users').where('id','==', userId).get().then(snap => { snap.forEach(doc => doc.ref.delete()); }).catch(()=>{});
+          return;
+        }
+        setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
+      };
+const combinedLocations = useMemo(() => {
         const masterLocs = data.locations;
         const logLocs = data.logs.map(l => l.location).filter(Boolean).filter(logLocName => !masterLocs.some(ml => ml.name === logLocName));
         const customLocObjects = Array.from(new Set(logLocs)).map(name => ({ name, category: 'Lain-lain' }));
