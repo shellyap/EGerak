@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>E-Gerak PPD Ranau — Firestore Collections (egerak/main/*)</title>
+  <title>E-Gerak PPD Ranau — Full (Urus Data, Analisis, Statistik (Pie), Leaderboard, Laporan)</title>
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -18,6 +18,9 @@
   <!-- Lucide icons UMD -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
+  <!-- Chart.js CDN (for PIE chart) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
   <!-- Firebase v9 compat (NOT modular) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -27,11 +30,12 @@
     @media print { .no-print{display:none!important} }
     .animate-in { animation: fadeIn .28s ease-out; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:translateY(0) } }
+    .chart-container { max-width: 520px; margin: 0 auto; }
   </style>
 
   <!-- Initialize Firebase (compat) -->
   <script>
-    // KEEP your existing firebaseConfig (from uploaded file). Replace if needed.
+    // Keep your firebase config or replace with yours
     const firebaseConfig = {
       apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do",
       authDomain: "egerak-4f922.firebaseapp.com",
@@ -55,27 +59,42 @@
   <script type="text/babel">
   const { useState, useEffect, useMemo, useRef, Component } = React;
 
-  // ---------- ICONS ----------
-  const createIcon = (iconName) => ({ size = 20, className = '' }) => {
+  // Icon helper
+  const createIcon = (name) => ({ size=18 }) => {
     if (typeof lucide === 'undefined') return null;
-    const def = lucide.icons ? lucide.icons[iconName] : lucide[iconName];
+    const def = lucide.icons ? lucide.icons[name] : lucide[name];
     if (!def) return null;
-    return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className }, def.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i })));
+    return React.createElement('svg', { width: size, height: size, viewBox:'0 0 24 24', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round', strokeLinejoin:'round' }, def.map(([t,a],i)=>React.createElement(t, {...a, key:i})));
   };
-  const MapPin = createIcon('MapPin'), CheckCircle = createIcon('CheckCircle'), Plus = createIcon('Plus'), Trash2 = createIcon('Trash2'), Search = createIcon('Search'), UsersIc = createIcon('Users'), FileSpreadsheet = createIcon('FileSpreadsheet'), Printer = createIcon('Printer'), Filter = createIcon('Filter'), Calendar = createIcon('Calendar'), LogOut = createIcon('LogOut');
+  const MapPin = createIcon('MapPin'), CheckCircle = createIcon('CheckCircle'), Plus = createIcon('Plus'), Trash2 = createIcon('Trash2'), FileSpreadsheet = createIcon('FileSpreadsheet'), Printer = createIcon('Printer'), LogOut = createIcon('LogOut'), Star = createIcon('Star');
 
-  // ---------- INITIAL DATA (used to seed collections if empty) ----------
+  // ---------- Helpers ----------
+  function toAllCaps(str) { return (str || '').toUpperCase(); }
+  function formatDate(s) {
+    if (!s) return '-';
+    const p = s.split('-'); if (p.length!==3) return s;
+    return `${p[2]}/${p[1]}/${p[0].slice(-2)}`;
+  }
+  function downloadCSV(data, filename) {
+    const headers = ["Tarikh","Nama","Perkara","Lokasi","Catatan"];
+    const rows = data.map(r => [formatDate(r.date), r.userName, r.type, r.location, (r.catatan||'').replace(/(\r\n|\n|\r)/gm,' ')]);
+    const csv = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+    const a = document.createElement('a'); a.href = encodeURI(csv); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  // ---------- Initial data (seed) ----------
   const CURRENT_YEAR = new Date().getFullYear();
   const INITIAL_DATA = {
     users: [
-      { id: 1, username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT / Pengurusan' },
-      { id: 2, username: 'staff', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' },
-      { id: 3, username: 'guru', password: '123', role: 'staff', name: 'Pn. Siti', department: 'Unit Akademik' }
+      { id: 1, username: 'shell', password: 'shellyap', role: 'admin', name: toAllCaps('Shell Yap'), department: toAllCaps('IT / Pengurusan') },
+      { id: 2, username: 'staff', password: '123', role: 'staff', name: toAllCaps('En. Razak'), department: toAllCaps('Unit Pembangunan') },
+      { id: 3, username: 'guru', password: '123', role: 'staff', name: toAllCaps('Pn. Siti'), department: toAllCaps('Unit Akademik') }
     ],
     logs: [
-      { id: 101, userId: 2, userName: 'En. Razak', type: 'Lawatan Tapak', location: 'SK Kilimu', date: `${CURRENT_YEAR}-10-24`, catatan: 'Memantau projek pembinaan blok baharu.' },
-      { id: 102, userId: 2, userName: 'En. Razak', type: 'Mesyuarat', location: 'PPD Kota Kinabalu', date: `${CURRENT_YEAR}-10-25`, catatan: 'Mesyuarat penyelarasan aset.' },
-      { id: 103, userId: 3, userName: 'Pn. Siti', type: 'Bengkel', location: 'SMK Ranau', date: `${CURRENT_YEAR}-10-24`, catatan: 'Bengkel KSSM Sains.' }
+      { id: 101, userId: 2, userName: toAllCaps('En. Razak'), type: 'Lawatan Tapak', location: 'SK Kilimu', date: `${CURRENT_YEAR}-10-24`, catatan: 'Memantau projek pembinaan blok baharu.' },
+      { id: 102, userId: 2, userName: toAllCaps('En. Razak'), type: 'Mesyuarat', location: 'PPD Kota Kinabalu', date: `${CURRENT_YEAR}-10-25`, catatan: 'Mesyuarat penyelarasan aset.' },
+      { id: 103, userId: 3, userName: toAllCaps('Pn. Siti'), type: 'Bengkel', location: 'SMK Ranau', date: `${CURRENT_YEAR}-10-24`, catatan: 'Bengkel KSSM Sains.' },
+      { id: 104, userId: 1, userName: toAllCaps('Shell Yap'), type: 'Urusan Rasmi', location: 'JPN Sabah', date: `${CURRENT_YEAR}-10-20`, catatan: 'Menghantar laporan bulanan.' }
     ],
     locations: [
       { name: 'PPD Ranau', category: 'Lain-lain' },
@@ -90,7 +109,7 @@
     ]
   };
 
-  // ---------- Firestore references (collections under egerak/main) ----------
+  // ---------- Firestore refs ----------
   const db = firebase.firestore();
   const rootDoc = db.collection('egerak').doc('main');
   const usersCol = () => rootDoc.collection('users');
@@ -98,58 +117,35 @@
   const locationsCol = () => rootDoc.collection('locations');
   const typesCol = () => rootDoc.collection('activityTypes');
 
-  // Ensure root doc exists and seed collections if empty
-  async function ensureCollectionsSeeded() {
+  async function ensureSeeded() {
     try {
-      // create root doc if missing
-      const docSnap = await rootDoc.get();
-      if (!docSnap.exists) await rootDoc.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      const d = await rootDoc.get();
+      if (!d.exists) await rootDoc.set({ createdAt: firebase.firestore.FieldValue.serverTimestamp() });
 
-      // check each collection and seed if empty
-      const seedIfEmpty = async (colRef, items, mapFn = (i) => i) => {
-        const snap = await colRef.limit(1).get();
-        if (snap.empty) {
+      const seedIfEmpty = async (colRef, items, mapper = i => i) => {
+        const one = await colRef.limit(1).get();
+        if (one.empty) {
           const batch = db.batch();
-          items.forEach((item) => {
-            const ref = colRef.doc(); // auto id
-            batch.set(ref, mapFn(item));
-          });
+          items.forEach(it => { const r = colRef.doc(); batch.set(r, mapper(it)); });
           await batch.commit();
         }
       };
-
-      await seedIfEmpty(usersCol(), INITIAL_DATA.users, (u) => ({ ...u }));
-      await seedIfEmpty(locationsCol(), INITIAL_DATA.locations, (l) => ({ ...l }));
-      await seedIfEmpty(typesCol(), INITIAL_DATA.activityTypes.map(t => ({ name: t })), (t) => ({ name: t.name || t }));
-      await seedIfEmpty(logsCol(), INITIAL_DATA.logs, (l) => ({ ...l }));
-      console.log('Collections ensured/seeded if empty.');
+      await seedIfEmpty(usersCol(), INITIAL_DATA.users, u => ({ ...u }));
+      await seedIfEmpty(locationsCol(), INITIAL_DATA.locations, l => ({ ...l }));
+      await seedIfEmpty(typesCol(), INITIAL_DATA.activityTypes.map(t => ({ name: t })), t => ({ name: t.name || t }));
+      await seedIfEmpty(logsCol(), INITIAL_DATA.logs, l => ({ ...l }));
+      console.log('Seed complete (if empty).');
     } catch (e) {
       console.error('Seeding error', e);
       throw e;
     }
   }
 
-  // ---------- Utility ----------
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    const parts = dateString.split('-');
-    if (parts.length !== 3) return dateString;
-    const [year, month, day] = parts;
-    return `${day}/${month}/${year.slice(-2)}`;
-  };
-
-  const downloadCSV = (data, filename) => {
-    const headers = ["Tarikh", "Nama", "Tujuan", "Lokasi", "Catatan"];
-    const rows = data.map(row => [ formatDate(row.date), row.userName, row.type, row.location, (row.catatan||'').replace(/(\r\n|\n|\r)/gm, ' ') ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(","))].join("\n");
-    const link = document.createElement('a'); link.setAttribute('href', encodeURI(csvContent)); link.setAttribute('download', filename); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  };
-
-  // ---------- Simple ErrorBoundary ----------
+  // ---------- Error boundary ----------
   class ErrorBoundary extends Component {
-    constructor(props){ super(props); this.state={hasError:false,err:null}; }
-    static getDerivedStateFromError(err){ return { hasError:true, err }; }
-    render(){ if(this.state.hasError) return (<div className="p-6 text-center text-red-600 bg-red-50 rounded m-4">{String(this.state.err)}</div>); return this.props.children; }
+    constructor(p){ super(p); this.state = { hasError: false, err: null }; }
+    static getDerivedStateFromError(err) { return { hasError: true, err }; }
+    render(){ if (this.state.hasError) return <div className="p-6 bg-red-50 text-red-700 rounded">{String(this.state.err)}</div>; return this.props.children; }
   }
 
   // ---------- App ----------
@@ -157,155 +153,110 @@
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [successMsg, setSuccessMsg] = useState('');
+    const [notice, setNotice] = useState('');
     const [users, setUsers] = useState([]);
     const [logs, setLogs] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [activityTypes, setActivityTypes] = useState([]);
+    const [types, setTypes] = useState([]);
 
-    // subscribe to collections (real-time)
     useEffect(() => {
-      let unsubUsers, unsubLogs, unsubLocs, unsubTypes;
-      (async () => {
+      let uUn, lUn, locUn, tUn;
+      (async ()=>{
         try {
-          await ensureCollectionsSeeded();
-
-          unsubUsers = usersCol().orderBy('id','asc').onSnapshot(snap => {
-            const arr = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
-            setUsers(arr);
-          });
-
-          unsubLocs = locationsCol().orderBy('name').onSnapshot(snap => { setLocations(snap.docs.map(d => ({ docId: d.id, ...d.data() }))); });
-
-          unsubTypes = typesCol().orderBy('name').onSnapshot(snap => { setActivityTypes(snap.docs.map(d => ({ docId: d.id, name: d.data().name }))); });
-
-          unsubLogs = logsCol().orderBy('date','desc').onSnapshot(snap => { setLogs(snap.docs.map(d => ({ docId: d.id, ...d.data() }))); });
-
+          await ensureSeeded();
+          uUn = usersCol().orderBy('id','asc').onSnapshot(snap => setUsers(snap.docs.map(d => ({ docId: d.id, ...d.data() }))));
+          locUn = locationsCol().orderBy('name').onSnapshot(snap => setLocations(snap.docs.map(d => ({ docId: d.id, ...d.data() }))));
+          tUn = typesCol().orderBy('name').onSnapshot(snap => setTypes(snap.docs.map(d => ({ docId: d.id, ...d.data() }))));
+          lUn = logsCol().orderBy('date','desc').onSnapshot(snap => setLogs(snap.docs.map(d => ({ docId: d.id, ...d.data() }))));
           setLoading(false);
         } catch (e) {
           console.error(e); setError('Gagal sambung ke pangkalan data.'); setLoading(false);
         }
       })();
-
-      return () => {
-        if (unsubUsers) unsubUsers(); if (unsubLogs) unsubLogs(); if (unsubLocs) unsubLocs(); if (unsubTypes) unsubTypes();
-      };
+      return () => { if (uUn) uUn(); if (lUn) lUn(); if (locUn) locUn(); if (tUn) tUn(); };
     }, []);
 
-    // ---------- Auth (local simple auth backed by users collection) ----------
-    const handleLogin = (username, password) => {
+    // Auth: username case-insensitive
+    const login = (username, password) => {
       setError('');
-      const found = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
-      if (found) { setUser(found); setSuccessMsg(''); } else setError('ID Pengguna atau kata laluan tidak sah.');
+      const found = users.find(u => (u.username||'').toLowerCase() === (username||'').toLowerCase() && u.password === password);
+      if (found) { setUser(found); setNotice(''); }
+      else setError('ID Pengguna atau kata laluan tidak sah.');
     };
 
-    const handleRegister = async ({ username, password, name, department }) => {
+    const register = async ({ username, password, name, department }) => {
       try {
-        // ensure unique username
-        if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) return setError('Username sudah wujud.');
-        // compute next numeric id
-        const maxId = users.reduce((m,u)=>Math.max(m, u.id||0), 0);
-        await usersCol().add({ id: maxId + 1, username, password, role: 'staff', name, department: department || '' });
-        setSuccessMsg('Pendaftaran berjaya, sila log masuk.'); setError('');
-      } catch (e) { console.error(e); setError('Gagal daftar pengguna.'); }
+        if (users.some(u => (u.username||'').toLowerCase() === (username||'').toLowerCase())) return setError('Username sudah wujud.');
+        const max = users.reduce((m,u)=>Math.max(m,u.id||0),0);
+        // enforce ALL CAPS for name and department
+        const payload = { id: max+1, username, password, role: 'staff', name: toAllCaps(name), department: toAllCaps(department||'') };
+        await usersCol().add(payload);
+        setNotice('Pendaftaran berjaya. Sila log masuk.');
+      } catch (e) { console.error(e); setError('Gagal mendaftar.'); }
     };
 
-    const handleLogout = () => { setUser(null); setError(''); setSuccessMsg(''); };
+    const logout = () => { setUser(null); setError(''); setNotice(''); };
 
-    // ---------- CRUD operations (collections) ----------
-    async function addLog(newLogData){
-      if(!user) return setError('Sila log masuk terlebih dahulu.');
+    // CRUD operations
+    const addLog = async (payload) => {
+      if (!user) return setError('Sila log masuk.');
       try {
-        const idVal = Date.now();
-        const payload = { id: idVal, userId: user.id, userName: user.name, ...newLogData };
-        await logsCol().add(payload);
-
-        // ensure location exists (if provided)
-        if (newLogData.location) {
-          const exists = locations.some(l => l.name === newLogData.location);
-          if (!exists) {
-            await locationsCol().add({ name: newLogData.location, category: 'Lain-lain' });
-          }
+        const id = Date.now();
+        await logsCol().add({ id, userId: user.id, userName: user.name, ...payload });
+        if (payload.location && !locations.some(l => l.name === payload.location)) {
+          await locationsCol().add({ name: payload.location, category: 'Lain-lain' });
         }
-        setSuccessMsg('Rekod berjaya disimpan.');
-        setTimeout(()=>setSuccessMsg(''), 2500);
-      } catch(e) { console.error(e); setError('Gagal simpan rekod.'); }
-    }
+        setNotice('Rekod berjaya disimpan.'); setTimeout(()=>setNotice(''),2000);
+      } catch (e) { console.error(e); setError('Gagal simpan rekod.'); }
+    };
+    const deleteLog = async (docId) => { try { await logsCol().doc(docId).delete(); } catch (e) { console.error(e); setError('Gagal padam rekod.'); } };
 
-    async function deleteLog(docId){
-      try { await logsCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam rekod.'); }
-    }
+    const addLocation = async (loc) => { try { if (locations.some(l=>l.name===loc.name)) return setError('Lokasi sudah wujud.'); await locationsCol().add(loc); } catch(e){ console.error(e); setError('Gagal tambah lokasi.'); } };
+    const deleteLocation = async (docId) => { try { await locationsCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam lokasi.'); } };
 
-    async function addLocation(obj){
-      try {
-        // prevent duplicate name
-        if (locations.some(l => l.name === obj.name)) return setError('Lokasi sudah wujud.');
-        await locationsCol().add(obj);
-      } catch(e){ console.error(e); setError('Gagal tambah lokasi.'); }
-    }
-    async function deleteLocation(docId){ try { await locationsCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam lokasi.'); } }
+    const addType = async (name) => { try { if (types.some(t=>t.name===name)) return setError('Perkara sudah wujud.'); await typesCol().add({ name }); } catch(e){ console.error(e); setError('Gagal tambah perkara.'); } };
+    const deleteType = async (docId) => { try { await typesCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam perkara.'); } };
 
-    async function addActivityType(name){ try { if (activityTypes.some(t=>t.name===name)) return setError('Perkara sudah wujud.'); await typesCol().add({ name }); } catch(e){ console.error(e); setError('Gagal tambah perkara.'); } }
-    async function deleteActivityType(docId){ try { await typesCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam perkara.'); } }
+    const addUser = async (u) => { try { if (users.some(x=> (x.username||'').toLowerCase()=== (u.username||'').toLowerCase())) return setError('Username exists'); const max = users.reduce((m,x)=>Math.max(m,x.id||0),0); await usersCol().add({ id: max+1, ...u }); } catch(e){ console.error(e); setError('Gagal tambah pengguna.'); } };
+    const deleteUser = async (docId) => { try { await usersCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam pengguna.'); } };
+    const resetPassword = async (docId) => { try { await usersCol().doc(docId).update({ password: '123' }); } catch(e){ console.error(e); setError('Gagal reset password.'); } };
 
-    async function addUser(newUser){
-      try {
-        if (users.some(u=>u.username.toLowerCase()===newUser.username.toLowerCase())) return setError('Username already exists.');
-        const maxId = users.reduce((m,u)=>Math.max(m, u.id||0), 0);
-        await usersCol().add({ id: maxId+1, ...newUser });
-      } catch(e){ console.error(e); setError('Gagal tambah pengguna.'); }
-    }
-    async function deleteUser(docId){ try { await usersCol().doc(docId).delete(); } catch(e){ console.error(e); setError('Gagal padam pengguna.'); } }
-    async function resetUserPassword(docId){ try { await usersCol().doc(docId).update({ password: '123' }); } catch(e){ console.error(e); setError('Gagal reset password.'); } }
-
-    // Derived lists
-    const combinedLocations = useMemo(() => {
-      const masterLocs = locations || [];
-      const logLocs = Array.from(new Set((logs || []).map(l=>l.location).filter(Boolean))).filter(name => !masterLocs.some(m=>m.name===name)).map(n=>({ name: n, category: 'Lain-lain' }));
-      return [...masterLocs, ...logLocs].sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+    const combinedLocations = useMemo(()=> {
+      const master = locations || [];
+      const fromLogs = Array.from(new Set((logs||[]).map(l=>l.location).filter(Boolean)));
+      const extras = fromLogs.filter(n=>!master.some(m=>m.name===n)).map(n=>({ name:n, category:'Lain-lain' }));
+      return [...master, ...extras].sort((a,b)=> (a.name||'').localeCompare(b.name||''));
     }, [locations, logs]);
 
-    const combinedActivityTypes = useMemo(() => {
-      const types = (activityTypes || []).map(t => t.name || t).filter(Boolean);
-      const fromLogs = Array.from(new Set((logs || []).map(l => l.type).filter(Boolean)));
-      return Array.from(new Set([...types, ...fromLogs])).sort();
-    }, [activityTypes, logs]);
+    const combinedTypes = useMemo(()=> {
+      const t = (types||[]).map(x=>x.name||x).filter(Boolean);
+      const fromLogs = Array.from(new Set((logs||[]).map(l=>l.type).filter(Boolean)));
+      return Array.from(new Set([...t, ...fromLogs])).sort();
+    }, [types, logs]);
 
     const allUserNames = useMemo(()=> Array.from(new Set([...(users||[]).map(u=>u.name), ...(logs||[]).map(l=>l.userName)])).sort(), [users, logs]);
 
     if (loading) return <div className="min-h-screen flex items-center justify-center">Menyambung ke pangkalan data...</div>;
-
-    if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} successMsg={successMsg} />;
+    if (!user) return <Login onLogin={login} onRegister={register} error={error} success={notice} />;
 
     return (
       <div className="min-h-screen bg-slate-50">
         <ErrorBoundary>
-          <div className="p-4 md:p-6 bg-white border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-900 text-white p-2 rounded"><MapPin size={18} /></div>
-              <div><h1 className="text-lg font-bold">E-Gerak</h1><div className="text-xs text-slate-500">PPD Ranau</div></div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm text-slate-600">{user.name} ({user.role})</div>
-              <button onClick={handleLogout} className="bg-red-600 text-white px-3 py-2 rounded flex items-center gap-2"><LogOut size={16}/>Log Keluar</button>
-            </div>
-          </div>
-
+          <Header user={user} onLogout={logout} />
           <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-3 space-y-6">
               {user.role === 'staff' ? (
-                <StaffArea user={user} logs={logs} onAddLog={addLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
+                <StaffArea user={user} logs={logs.filter(l=>l.userId===user.id || user.role==='admin')} onAddLog={addLog} combinedLocations={combinedLocations} combinedTypes={combinedTypes} />
               ) : (
-                <AdminArea user={user} logs={logs} users={users} locations={locations} activityTypes={activityTypes}
+                <AdminArea user={user} logs={logs} users={users} locations={locations} types={types}
                   onAddLocation={addLocation} onDeleteLocation={deleteLocation}
-                  onAddActivity={addActivityType} onDeleteActivity={deleteActivityType}
-                  onAddUser={addUser} onDeleteUser={deleteUser} onResetUserPassword={resetUserPassword}
-                  onDeleteLog={(docId)=>deleteLog(docId)}
-                  combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} allUserNames={allUserNames}
+                  onAddType={addType} onDeleteType={deleteType}
+                  onAddUser={addUser} onDeleteUser={deleteUser} onResetPassword={resetPassword}
+                  onDeleteLog={deleteLog}
+                  combinedLocations={combinedLocations} combinedTypes={combinedTypes} allUserNames={allUserNames}
                 />
               )}
             </div>
-
             <aside className="hidden md:block bg-white border border-slate-100 p-4 rounded-lg h-fit">
               <h3 className="font-bold mb-2">Pantau Cepat</h3>
               <div className="text-sm text-slate-600 mb-3">Jumlah rekod: <strong>{logs.length}</strong></div>
@@ -316,16 +267,41 @@
 
           <div className="p-6">
             {error && <div className="bg-red-50 text-red-700 p-3 rounded mb-4">{error}</div>}
-            {successMsg && <div className="bg-green-50 text-green-700 p-3 rounded mb-4">{successMsg}</div>}
-            <div className="text-xs text-slate-400">Data disimpan dalam koleksi Firestore: <code>egerak/main/{'{users,logs,locations,activityTypes}'}</code></div>
+            {notice && <div className="bg-green-50 text-green-700 p-3 rounded mb-4">{notice}</div>}
+            <div className="text-xs text-slate-400">Data disimpan: <code>egerak/main/{'{users,logs,locations,activityTypes}'}</code></div>
           </div>
         </ErrorBoundary>
       </div>
     );
   }
 
-  // ---------- Login Component ----------
-  function LoginPage({ onLogin, onRegister, error, successMsg }){
+  // ---------- Header ----------
+  function Header({ user, onLogout }) {
+    return (
+      <div className="p-4 md:p-6 bg-white border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="bg-blue-900 text-white p-2 rounded"><MapPin size={18} /></div>
+          <div><h1 className="text-lg font-bold">E-Gerak</h1><div className="text-xs text-slate-500">PPD Ranau</div></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-slate-600">{user.name} ({user.role})</div>
+          <button onClick={onLogout} className="bg-red-600 text-white px-3 py-2 rounded flex items-center gap-2"><LogOutIcon/>Log Keluar</button>
+        </div>
+      </div>
+    );
+  }
+
+  // small icon components using lucide
+  function LogOutIcon(){ return createIcon('LogOut')({size:16}); }
+  function MapPin(){ return createIcon('MapPin')({size:18}); }
+  function CheckCircle(){ return createIcon('CheckCircle')({size:16}); }
+  function FileSpreadsheet(){ return createIcon('FileSpreadsheet')({size:16}); }
+  function Printer(){ return createIcon('Printer')({size:16}); }
+  function PlusIcon(){ return createIcon('Plus')({size:14}); }
+  function TrashIcon(){ return createIcon('Trash2')({size:14}); }
+
+  // ---------- Login ----------
+  function Login({ onLogin, onRegister, error, success }) {
     const [isRegister, setIsRegister] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -333,30 +309,37 @@
     const [department, setDepartment] = useState('');
     const [roleTab, setRoleTab] = useState('staff');
 
-    const submit = (e) => { e.preventDefault(); if(isRegister) { onRegister({ username, password, name: fullName, department }); setUsername(''); setPassword(''); setFullName(''); setDepartment(''); setIsRegister(false); } else onLogin(username, password); };
+    const submit = (e) => {
+      e.preventDefault();
+      if (isRegister) {
+        onRegister({ username, password, name: fullName, department });
+        setUsername(''); setPassword(''); setFullName(''); setDepartment('');
+        setIsRegister(false);
+      } else onLogin(username, password);
+    };
 
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white shadow rounded-xl overflow-hidden border border-slate-100">
           <div className="p-6 bg-blue-900 text-white text-center">
-            <div className="mx-auto w-12 h-12 bg-white text-blue-900 rounded-full flex items-center justify-center mb-2"><MapPin size={18} /></div>
+            <div className="mx-auto w-12 h-12 bg-white text-blue-900 rounded-full flex items-center justify-center mb-2"><MapPin/></div>
             <h2 className="font-bold text-xl">E-Gerak</h2>
             <div className="text-xs opacity-80">PPD Ranau</div>
           </div>
           <div className="p-6">
             {!isRegister && <div className="flex gap-2 bg-slate-100 rounded p-1 mb-4">
-              <button onClick={()=>setRoleTab('staff')} className={`flex-1 py-2 ${roleTab==='staff' ? 'bg-white text-blue-900 shadow' : 'text-slate-500'}`}>Staf</button>
+              <button onClick={()=>setRoleTab('staff')} className={`flex-1 py-2 ${roleTab==='staff'? 'bg-white text-blue-900 shadow' : 'text-slate-500'}`}>Staf</button>
               <button onClick={()=>setRoleTab('admin')} className={`flex-1 py-2 ${roleTab==='admin'? 'bg-white text-blue-900 shadow' : 'text-slate-500'}`}>Admin</button>
             </div>}
             <form onSubmit={submit} className="space-y-3">
               {isRegister && <>
-                <input required placeholder="Nama Penuh" value={fullName} onChange={e=>setFullName(e.target.value)} className="w-full p-2 border rounded" />
-                <input placeholder="Jabatan / Unit" value={department} onChange={e=>setDepartment(e.target.value)} className="w-full p-2 border rounded" />
+                <input required placeholder="Nama Penuh" value={fullName} onChange={e=>setFullName(toAllCaps(e.target.value))} className="w-full p-2 border rounded" />
+                <input placeholder="Unit / Sekolah" value={department} onChange={e=>setDepartment(toAllCaps(e.target.value))} className="w-full p-2 border rounded" />
               </>}
               <input required placeholder="ID Pengguna" value={username} onChange={e=>setUsername(e.target.value)} className="w-full p-2 border rounded" />
               <input required type="password" placeholder="Kata Laluan" value={password} onChange={e=>setPassword(e.target.value)} className="w-full p-2 border rounded" />
               {error && <div className="text-red-600 text-sm">{error}</div>}
-              {successMsg && <div className="text-green-600 text-sm">{successMsg}</div>}
+              {success && <div className="text-green-600 text-sm">{success}</div>}
               <button type="submit" className="w-full bg-blue-900 text-white py-2 rounded">{isRegister ? 'Daftar' : 'Log Masuk'}</button>
             </form>
             <div className="mt-4 text-center">
@@ -368,176 +351,115 @@
     );
   }
 
-  // ---------- Staff area (entry / filter / report tabs) ----------
-  function StaffArea({ user, logs, onAddLog, combinedLocations, combinedActivityTypes }){
+  // ---------- Staff Area (unchanged) ----------
+  function StaffArea({ user, logs, onAddLog, combinedLocations, combinedTypes }) {
     const [tab, setTab] = useState('entry');
     return (
       <div>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">Selamat Datang, {user.name}</h2>
-          <div className="text-sm text-slate-500">{user.department}</div>
-        </div>
+        <div className="mb-6"><h2 className="text-2xl font-bold">Selamat Datang, {user.name}</h2><div className="text-sm text-slate-500">{user.department}</div></div>
         <div className="flex gap-2 mb-6">
           <button onClick={()=>setTab('entry')} className={tab==='entry' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Daftar Pergerakan</button>
           <button onClick={()=>setTab('filter')} className={tab==='filter' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Saring Rekod</button>
           <button onClick={()=>setTab('report')} className={tab==='report' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Laporan</button>
         </div>
-
-        {tab==='entry' && <StaffEntry onSubmit={onAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
-        {tab==='filter' && <StaffFilter logs={logs} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+        {tab==='entry' && <StaffEntry onSubmit={onAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedTypes} />}
+        {tab==='filter' && <StaffFilter logs={logs} combinedLocations={combinedLocations} combinedActivityTypes={combinedTypes} />}
         {tab==='report' && <StaffReport logs={logs} />}
       </div>
     );
   }
 
-  function StaffEntry({ onSubmit, combinedLocations, combinedActivityTypes }){
+  function StaffEntry({ onSubmit, combinedLocations, combinedActivityTypes }) {
     const [date, setDate] = useState(new Date().toISOString().slice(0,10));
     const [location, setLocation] = useState('');
     const [type, setType] = useState('');
     const [catatan, setCatatan] = useState('');
     const [useCustomLoc, setUseCustomLoc] = useState(false);
     const [useCustomType, setUseCustomType] = useState(false);
-
-    const submit = (e) => { e.preventDefault(); if(!date || !location || !type) return; onSubmit({ date, location, type, catatan }); setCatatan(''); setLocation(''); setType(''); };
-    const locs = combinedLocations || [];
-
+    const submit = (e)=>{ e.preventDefault(); if(!date||!location||!type) return; onSubmit({ date, location, type, catatan }); setCatatan(''); setLocation(''); setType(''); };
     return (
       <form onSubmit={submit} className="bg-white p-6 rounded shadow">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div><label className="text-xs">Tarikh</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full p-2 border rounded" /></div>
-          <div>
-            <label className="text-xs">Lokasi</label>
-            {!useCustomLoc ? (
-              <select value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded">
-                <option value="">Pilih lokasi...</option>
-                {locs.map((l, i)=><option key={i} value={l.name}>{l.name}</option>)}
-              </select>
-            ) : <input value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip lokasi baru..." />}
-          </div>
-          <div>
-            <label className="text-xs">Perkara</label>
-            {!useCustomType ? (
-              <select value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded">
-                <option value="">Pilih perkara...</option>
-                {combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}
-              </select>
-            ) : <input value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip perkara baru..." />}
-          </div>
+          <div><label className="text-xs">Lokasi</label>{!useCustomLoc ? (<select value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded"><option value="">Pilih lokasi...</option>{combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}</select>) : <input value={location} onChange={e=>setLocation(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip lokasi baru..." />}</div>
+          <div><label className="text-xs">Perkara</label>{!useCustomType ? (<select value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded"><option value="">Pilih perkara...</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>) : <input value={type} onChange={e=>setType(e.target.value)} className="w-full p-2 border rounded" placeholder="Taip perkara baru..." />}</div>
         </div>
-
-        <div className="mt-4">
-          <label className="text-xs">Catatan</label>
-          <textarea value={catatan} onChange={e=>setCatatan(e.target.value)} rows={3} className="w-full p-2 border rounded" />
-        </div>
-
-        <div className="flex items-center gap-2 mt-4">
-          <button type="submit" className="bg-blue-900 text-white px-4 py-2 rounded flex items-center gap-2"><CheckCircle size={16}/>Hantar</button>
-          <button type="button" onClick={()=>{ setUseCustomLoc(!useCustomLoc); }} className="px-3 py-2 border rounded">Tambah Lokasi</button>
-          <button type="button" onClick={()=>{ setUseCustomType(!useCustomType); }} className="px-3 py-2 border rounded">Tambah Perkara</button>
-        </div>
+        <div className="mt-4"><label className="text-xs">Catatan</label><textarea value={catatan} onChange={e=>setCatatan(e.target.value)} rows={3} className="w-full p-2 border rounded" /></div>
+        <div className="flex items-center gap-2 mt-4"><button type="submit" className="bg-blue-900 text-white px-4 py-2 rounded flex items-center gap-2"><CheckCircle/>Hantar</button><button type="button" onClick={()=>setUseCustomLoc(!useCustomLoc)} className="px-3 py-2 border rounded">Tambah Lokasi</button><button type="button" onClick={()=>setUseCustomType(!useCustomType)} className="px-3 py-2 border rounded">Tambah Perkara</button></div>
       </form>
     );
   }
 
-  function StaffFilter({ logs, combinedLocations, combinedActivityTypes }){
+  function StaffFilter({ logs, combinedLocations, combinedActivityTypes }) {
     const [date, setDate] = useState('');
     const [place, setPlace] = useState('');
     const [type, setType] = useState('');
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-
-    const isActive = date || place || type;
-    const filtered = (logs||[]).filter(l => {
-      if(!l.date) return false;
-      if(!isActive) return l.date.startsWith(currentMonth);
-      return (date ? l.date === date : true) && (place ? l.location === place : true) && (type ? l.type === type : true);
-    });
-
+    const isActive = date||place||type;
+    const filtered = (logs||[]).filter(l=>{ if(!l.date) return false; if(!isActive) return l.date.startsWith(currentMonth); return (date ? l.date===date : true) && (place ? l.location===place : true) && (type ? l.type===type : true); });
     return (
       <div className="space-y-4">
         <div className="bg-white p-4 rounded">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="p-2 border rounded" />
-            <select value={place} onChange={e=>setPlace(e.target.value)} className="p-2 border rounded">
-              <option value="">Semua Lokasi</option>
-              {combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}
-            </select>
-            <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded">
-              <option value="">Semua Perkara</option>
-              {combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}
-            </select>
+            <select value={place} onChange={e=>setPlace(e.target.value)} className="p-2 border rounded"><option value="">Semua Lokasi</option>{combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}</select>
+            <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded"><option value="">Semua Perkara</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>
           </div>
         </div>
-
         <div className="bg-white p-4 rounded">
           <div className="text-xs text-slate-500 mb-3">Memaparkan {filtered.length} rekod ({isActive ? 'Saringan' : 'Bulan semasa'})</div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th></tr></thead>
-              <tbody>
-                {filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td></tr>)}
-                {filtered.length===0 && <tr><td colSpan="4" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th></tr></thead><tbody>{filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td></tr>)}{filtered.length===0 && <tr><td colSpan="4" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}</tbody></table></div>
         </div>
       </div>
     );
   }
 
-  function StaffReport({ logs }){
+  function StaffReport({ logs }) {
     const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
-    const monthly = (logs||[]).filter(l => l.date && l.date.startsWith(month));
+    const monthly = (logs||[]).filter(l=>l.date && l.date.startsWith(month));
     return (
       <div className="space-y-4">
         <div className="bg-white p-4 rounded flex justify-between items-center">
           <div><h3 className="font-bold">Laporan Bulanan</h3><div className="text-xs text-slate-500">Pilih bulan untuk muat turun / cetak</div></div>
           <div className="flex items-center gap-2">
             <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
-            <button onClick={()=>downloadCSV(monthly, `Laporan_${month}.csv`)} className="bg-green-600 text-white px-3 py-2 rounded flex items-center gap-2"><FileSpreadsheet size={16}/>CSV</button>
-            <button onClick={()=>window.print()} className="bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2"><Printer size={16}/>Cetak</button>
+            <button onClick={()=>downloadCSV(monthly, `Laporan_${month}.csv`)} className="bg-green-600 text-white px-3 py-2 rounded flex items-center gap-2"><FileSpreadsheet/>CSV</button>
+            <button onClick={()=>window.print()} className="bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2"><Printer/>Cetak</button>
           </div>
         </div>
-
-        <div className="bg-white p-4 rounded">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead>
-            <tbody>
-              {monthly.map(l => <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}
-              {monthly.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <div className="bg-white p-4 rounded"><table className="w-full text-sm"><thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead><tbody>{monthly.map(l=><tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}{monthly.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}</tbody></table></div>
       </div>
     );
   }
 
-  // ---------- Admin area ----------
-  function AdminArea({ user, logs, users, locations, activityTypes, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onAddUser, onDeleteUser, onResetUserPassword, onDeleteLog, combinedLocations, combinedActivityTypes, allUserNames }){
+  // ---------- Admin Area (5 tabs) ----------
+  function AdminArea({ user, logs, users, locations, types, onAddLocation, onDeleteLocation, onAddType, onDeleteType, onAddUser, onDeleteUser, onResetPassword, onDeleteLog, combinedLocations, combinedTypes, allUserNames }) {
     const [tab, setTab] = useState('data');
     return (
       <div>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">Dashboard Pentadbir</h2>
-          <div className="text-sm text-slate-500">{user.name}</div>
-        </div>
-
+        <div className="mb-6"><h2 className="text-2xl font-bold">Dashboard Pentadbir</h2><div className="text-sm text-slate-500">{user.name}</div></div>
         <div className="flex gap-2 mb-6">
           <button onClick={()=>setTab('data')} className={tab==='data' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Urus Data</button>
-          <button onClick={()=>setTab('analisis')} className={tab==='analisis' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Analisis</button>
+          <button onClick={()=>setTab('analysis')} className={tab==='analysis' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Analisis</button>
           <button onClick={()=>setTab('reports')} className={tab==='reports' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Laporan</button>
+          <button onClick={()=>setTab('statistik')} className={tab==='statistik' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Statistik</button>
+          <button onClick={()=>setTab('leaderboard')} className={tab==='leaderboard' ? 'py-2 px-4 border-b-2 border-blue-900' : 'py-2 px-4 text-slate-500'}>Leaderboard</button>
         </div>
 
-        {tab==='data' && <AdminData users={users} locations={locations} activityTypes={activityTypes} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onAddUser={onAddUser} onDeleteUser={onDeleteUser} onResetUserPassword={onResetUserPassword} />}
-        {tab==='analisis' && <AdminAnalysis logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
-        {tab==='reports' && <AdminReport logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+        {tab==='data' && <AdminData users={users} locations={locations} types={types} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddType={onAddType} onDeleteType={onDeleteType} onAddUser={onAddUser} onDeleteUser={onDeleteUser} onResetPassword={onResetPassword} />}
+        {tab==='analysis' && <AdminAnalysis logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedTypes={combinedTypes} onDeleteLog={onDeleteLog} />}
+        {tab==='reports' && <AdminReport logs={logs} allUserNames={allUserNames} combinedLocations={combinedLocations} combinedTypes={combinedTypes} />}
+        {tab==='statistik' && <AdminStats logs={logs} />}
+        {tab==='leaderboard' && <AdminLeaderboard logs={logs} users={users} />}
       </div>
     );
   }
 
-  function AdminData({ users, locations, activityTypes, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onAddUser, onDeleteUser, onResetUserPassword }){
+  // AdminData
+  function AdminData({ users, locations, types, onAddLocation, onDeleteLocation, onAddType, onDeleteType, onAddUser, onDeleteUser, onResetPassword }) {
     const [locName, setLocName] = useState(''); const [locCat, setLocCat] = useState('Lain-lain');
-    const [actName, setActName] = useState('');
+    const [typeName, setTypeName] = useState('');
     const [uUsername, setUUsername] = useState(''); const [uPassword, setUPassword] = useState(''); const [uName, setUName] = useState(''); const [uDept, setUDept] = useState('');
 
     return (
@@ -545,99 +467,59 @@
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded">
             <h4 className="font-bold mb-2">Lokasi</h4>
-            <div className="flex gap-2 mb-3">
-              <select value={locCat} onChange={e=>setLocCat(e.target.value)} className="p-2 border rounded">
-                <option>Sekolah Rendah</option><option>Sekolah Menengah</option><option>Lain-lain</option>
-              </select>
-              <input value={locName} onChange={e=>setLocName(e.target.value)} placeholder="Nama lokasi" className="p-2 border rounded flex-1" />
-              <button onClick={()=>{ if(locName) { onAddLocation({ name: locName, category: locCat }); setLocName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><Plus/> Tambah</button>
-            </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {locations.map(l => <div key={l.docId} className="flex justify-between items-center p-2 border rounded"><div><div className="font-medium">{l.name}</div><div className="text-xs text-slate-500">{l.category}</div></div><button onClick={()=>onDeleteLocation(l.docId)} className="text-red-500"><Trash2/></button></div>)}
-            </div>
+            <div className="flex gap-2 mb-3"><select value={locCat} onChange={e=>setLocCat(e.target.value)} className="p-2 border rounded"><option>Sekolah Rendah</option><option>Sekolah Menengah</option><option>Lain-lain</option></select><input value={locName} onChange={e=>setLocName(e.target.value)} placeholder="Nama lokasi" className="p-2 border rounded flex-1" /><button onClick={()=>{ if(locName){ onAddLocation({ name: locName, category: locCat }); setLocName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><PlusIcon/> Tambah</button></div>
+            <div className="space-y-1 max-h-48 overflow-y-auto">{locations.map(l=> <div key={l.docId} className="flex justify-between items-center p-2 border rounded"><div><div className="font-medium">{l.name}</div><div className="text-xs text-slate-500">{l.category}</div></div><button onClick={()=>onDeleteLocation(l.docId)} className="text-red-500"><TrashIcon/></button></div>)}</div>
           </div>
-
           <div className="bg-white p-4 rounded">
             <h4 className="font-bold mb-2">Perkara (Activity Types)</h4>
-            <div className="flex gap-2 mb-3">
-              <input value={actName} onChange={e=>setActName(e.target.value)} placeholder="Perkara baru" className="p-2 border rounded flex-1" />
-              <button onClick={()=>{ if(actName) { onAddActivity(actName); setActName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><Plus/> Tambah</button>
-            </div>
-            <div className="space-y-1">
-              {activityTypes.map(t => <div key={t.docId} className="flex justify-between items-center p-2 border rounded"><div>{t.name}</div><button onClick={()=>onDeleteActivity(t.docId)} className="text-red-500"><Trash2/></button></div>)}
-            </div>
+            <div className="flex gap-2 mb-3"><input value={typeName} onChange={e=>setTypeName(e.target.value)} placeholder="Perkara baru" className="p-2 border rounded flex-1" /><button onClick={()=>{ if(typeName){ onAddType(typeName); setTypeName(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded"><PlusIcon/> Tambah</button></div>
+            <div className="space-y-1">{types.map(t=> <div key={t.docId} className="flex justify-between items-center p-2 border rounded"><div>{t.name}</div><button onClick={()=>onDeleteType(t.docId)} className="text-red-500"><TrashIcon/></button></div>)}</div>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded">
           <h4 className="font-bold mb-2">Pengguna</h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3">
-            <input value={uUsername} onChange={e=>setUUsername(e.target.value)} placeholder="ID Pengguna" className="p-2 border rounded" />
-            <input value={uPassword} onChange={e=>setUPassword(e.target.value)} placeholder="Kata Laluan" className="p-2 border rounded" />
-            <input value={uName} onChange={e=>setUName(e.target.value)} placeholder="Nama Penuh" className="p-2 border rounded" />
-            <input value={uDept} onChange={e=>setUDept(e.target.value)} placeholder="Jabatan" className="p-2 border rounded" />
-          </div>
-          <div className="flex gap-2 mb-4">
-            <button onClick={()=>{ if(uUsername && uPassword && uName) { onAddUser({ username: uUsername, password: uPassword, role: 'staff', name: uName, department: uDept }); setUUsername(''); setUPassword(''); setUName(''); setUDept(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Tambah Pengguna</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs text-slate-500"><tr><th className="p-2">Nama</th><th className="p-2">ID</th><th className="p-2">Jabatan</th><th className="p-2">Tindakan</th></tr></thead>
-              <tbody>
-                {users.map(u => <tr key={u.docId} className="border-t"><td className="p-2 font-medium">{u.name}</td><td className="p-2">{u.username}</td><td className="p-2">{u.department}</td><td className="p-2"><button onClick={()=>onResetUserPassword(u.docId)} className="text-orange-600 mr-2">Reset</button>{u.role!=='admin' && <button onClick={()=>onDeleteUser(u.docId)} className="text-red-600">Padam</button>}</td></tr>)}
-              </tbody>
-            </table>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3"><input value={uUsername} onChange={e=>setUUsername(e.target.value)} placeholder="ID Pengguna" className="p-2 border rounded" /><input value={uPassword} onChange={e=>setUPassword(e.target.value)} placeholder="Kata Laluan" className="p-2 border rounded" /><input value={uName} onChange={e=>setUName(e.target.value)} placeholder="Nama Penuh" className="p-2 border rounded" /><input value={uDept} onChange={e=>setUDept(e.target.value)} placeholder="Jabatan" className="p-2 border rounded" /></div>
+          <div className="flex gap-2 mb-4"><button onClick={()=>{ if(uUsername&&uPassword&&uName){ onAddUser({ username:uUsername, password:uPassword, role:'staff', name:uName, department:uDept }); setUUsername(''); setUPassword(''); setUName(''); setUDept(''); } }} className="px-3 py-2 bg-blue-600 text-white rounded">Tambah Pengguna</button></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-xs text-slate-500"><tr><th className="p-2">Nama</th><th className="p-2">ID</th><th className="p-2">Jabatan</th><th className="p-2">Tindakan</th></tr></thead><tbody>{users.map(u=><tr key={u.docId} className="border-t"><td className="p-2 font-medium">{u.name}</td><td className="p-2">{u.username}</td><td className="p-2">{u.department}</td><td className="p-2"><button onClick={()=>onResetPassword(u.docId)} className="text-orange-600 mr-2">Reset</button>{u.role!=='admin'&&<button onClick={()=>onDeleteUser(u.docId)} className="text-red-600">Padam</button>}</td></tr>)}</tbody></table></div>
         </div>
       </div>
     );
   }
 
-  function AdminAnalysis({ logs, allUserNames, combinedLocations, combinedActivityTypes, onDeleteLog }){
+  // AdminAnalysis
+  function AdminAnalysis({ logs, allUserNames, combinedLocations, combinedTypes, onDeleteLog }) {
     const [month, setMonth] = useState('');
     const [staff, setStaff] = useState('');
     const [place, setPlace] = useState('');
     const [type, setType] = useState('');
-
-    const filtered = (logs||[]).filter(l => {
-      if(!l.date) return false;
-      return (month ? l.date.startsWith(month) : true) && (staff ? l.userName===staff : true) && (place ? l.location===place : true) && (type ? l.type===type : true);
-    });
-
+    const filtered = (logs||[]).filter(l=>{ if(!l.date) return false; return (month ? l.date.startsWith(month) : true) && (staff ? l.userName===staff : true) && (place ? l.location===place : true) && (type ? l.type===type : true); });
     return (
       <div className="space-y-4">
         <div className="bg-white p-4 rounded grid grid-cols-1 md:grid-cols-4 gap-2">
           <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
           <select value={staff} onChange={e=>setStaff(e.target.value)} className="p-2 border rounded"><option value="">Semua Staf</option>{allUserNames.map((n,i)=><option key={i} value={n}>{n}</option>)}</select>
           <select value={place} onChange={e=>setPlace(e.target.value)} className="p-2 border rounded"><option value="">Semua Lokasi</option>{combinedLocations.map((l,i)=><option key={i} value={l.name}>{l.name}</option>)}</select>
-          <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded"><option value="">Semua Perkara</option>{combinedActivityTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>
+          <select value={type} onChange={e=>setType(e.target.value)} className="p-2 border rounded"><option value="">Semua Perkara</option>{combinedTypes.map((t,i)=><option key={i} value={t}>{t}</option>)}</select>
         </div>
-
         <div className="bg-white p-4 rounded overflow-x-auto">
           <div className="text-sm text-slate-500 mb-2">Jumlah rekod: <strong>{filtered.length}</strong></div>
-          <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Tindakan</th></tr></thead>
-            <tbody>
-              {filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2"><button onClick={()=>onDeleteLog(l.docId)} className="text-red-600">Padam</button></td></tr>)}
-            </tbody>
-          </table>
+          <table className="w-full text-sm"><thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Tindakan</th></tr></thead>
+            <tbody>{filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2"><button onClick={()=>onDeleteLog(l.docId)} className="text-red-600">Padam</button></td></tr>)}</tbody></table>
         </div>
       </div>
     );
   }
 
-  function AdminReport({ logs, allUserNames, combinedLocations, combinedActivityTypes }){
+  // AdminReport
+  function AdminReport({ logs, allUserNames, combinedLocations, combinedTypes }) {
     const [month, setMonth] = useState(new Date().toISOString().slice(0,7));
-    const [staff, setStaff] = useState(''); const [place, setPlace] = useState(''); const [type, setType] = useState('');
-
-    const filtered = (logs||[]).filter(l => l.date && l.date.startsWith(month) && (staff ? l.userName===staff : true) && (place ? l.location===place : true) && (type ? l.type===type : true));
+    const [staff, setStaff] = useState('');
+    const filtered = (logs||[]).filter(l=>l.date && l.date.startsWith(month) && (staff ? l.userName===staff : true));
     return (
       <div className="space-y-4">
         <div className="bg-white p-4 rounded flex justify-between items-center">
-          <div>
-            <h4 className="font-bold">Laporan Bulanan (Pentadbir)</h4>
-            <div className="text-xs text-slate-500">Pilih bulan dan saring</div>
-          </div>
+          <div><h4 className="font-bold">Laporan Bulanan (Pentadbir)</h4><div className="text-xs text-slate-500">Pilih bulan dan saring</div></div>
           <div className="flex items-center gap-2">
             <input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="p-2 border rounded" />
             <select value={staff} onChange={e=>setStaff(e.target.value)} className="p-2 border rounded"><option value="">Semua Staf</option>{allUserNames.map((n,i)=><option key={i} value={n}>{n}</option>)}</select>
@@ -646,13 +528,91 @@
         </div>
 
         <div className="bg-white p-4 rounded overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead>
-            <tbody>
-              {filtered.map(l => <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}
-              {filtered.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}
-            </tbody>
-          </table>
+          <table className="w-full text-sm"><thead className="text-xs text-slate-500"><tr><th className="p-2">Tarikh</th><th className="p-2">Nama</th><th className="p-2">Perkara</th><th className="p-2">Lokasi</th><th className="p-2">Catatan</th></tr></thead>
+            <tbody>{filtered.map(l=> <tr key={l.docId} className="border-t"><td className="p-2">{formatDate(l.date)}</td><td className="p-2">{l.userName}</td><td className="p-2">{l.type}</td><td className="p-2">{l.location}</td><td className="p-2 italic">{l.catatan||'-'}</td></tr>)}{filtered.length===0 && <tr><td colSpan="5" className="p-4 text-center text-slate-400">Tiada rekod.</td></tr>}</tbody></table>
+        </div>
+      </div>
+    );
+  }
+
+  // AdminStats (PIE chart using Chart.js)
+  function AdminStats({ logs }) {
+    const canvasRef = useRef(null);
+    const chartRef = useRef(null);
+
+    const perType = {};
+    (logs||[]).forEach(l => { if (!l.type) return; perType[l.type] = (perType[l.type]||0)+1; });
+
+    const labels = Object.keys(perType);
+    const data = Object.values(perType);
+
+    useEffect(()=> {
+      if (!canvasRef.current) return;
+      // destroy previous
+      if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }
+      const ctx = canvasRef.current.getContext('2d');
+      chartRef.current = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: [
+              '#2563eb','#16a34a','#dc2626','#7c3aed','#f59e0b','#0d9488','#e11d48','#1e3a8a','#4f46e5','#d946ef'
+            ],
+            borderColor: '#fff',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { position: 'right', labels: { boxWidth: 14 } }
+          },
+          maintainAspectRatio: false
+        }
+      });
+    }, [labels.join(','), data.join(',')]);
+
+    return (
+      <div className="bg-white p-6 rounded shadow">
+        <h3 className="font-bold text-lg mb-4">Statistik Pergerakan (Pie Chart)</h3>
+        {labels.length === 0 ? <div className="text-sm text-slate-500">Tiada data untuk dipaparkan.</div> : (
+          <div className="chart-container" style={{height:320}}>
+            <canvas ref={canvasRef}></canvas>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // AdminLeaderboard
+  function AdminLeaderboard({ logs, users }) {
+    const counts = {};
+    (logs||[]).forEach(l => { if (!l.userName) return; counts[l.userName] = (counts[l.userName]||0) + 1; });
+    const arr = Object.entries(counts).map(([name,c])=>({ name, c })).sort((a,b)=>b.c-a.c);
+    const top = arr.slice(0,10);
+    const max = top.length ? top[0].c : 0;
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded">
+          <h4 className="font-bold">Leaderboard — Pengguna Paling Aktif</h4>
+          <div className="text-xs text-slate-500 mb-3">Memaparkan top 10 mengikut bilangan rekod</div>
+          <div className="space-y-3">
+            {top.length===0 && <div className="text-sm text-slate-400">Tiada rekod.</div>}
+            {top.map((t,i)=> {
+              const pct = max ? Math.round((t.c/max)*100) : 0;
+              return (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="w-8 text-sm font-medium">{i+1}.</div>
+                  <div className="flex-1">
+                    <div className="flex justify-between text-sm"><div className="font-medium">{t.name}</div><div className="text-xs text-slate-500">{t.c}</div></div>
+                    <div className="w-full bg-slate-100 rounded h-3 mt-1"><div className="bg-blue-600 h-3 rounded" style={{width:`${pct}%`}}></div></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
@@ -660,7 +620,7 @@
 
   // ---------- Render ----------
   const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(<App/>);
+  root.render(<App />);
 
   </script>
 </body>
