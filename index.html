@@ -53,16 +53,20 @@
       };
       firebase.initializeApp(firebaseConfig);
 
-  // --- REALTIME RELIABILITY PATCH ADDED ---
+  // *** FIX MODE 2 : EDGE REALTIME SYNC PATCH ***
+  try {
+    firebase.firestore().disableNetwork(); 
+    firebase.firestore().enableNetwork();
+  } catch(e){}
+
   firebase.firestore().settings({
     experimentalForceLongPolling: true,
-    merge: true
+    experimentalAutoDetectLongPolling: false,
+    cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
   });
 
-  firebase.firestore().enablePersistence({ synchronizeTabs: true })
-    .catch((err) => {
-      console.warn("Persistence error:", err.code);
-    });
+  // Prevent Edge storage blocking from breaking Firestore
+  try { db._firestoreClient._persistenceKey = "edge-no-persistence"; } catch(e){}
 
       if (typeof firebase.analytics === 'function') firebase.analytics();
       console.log('Firebase initialized (compat).');
