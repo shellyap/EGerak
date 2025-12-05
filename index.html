@@ -95,13 +95,14 @@
     }
     initAuth();
 
-    // Forced Path Strategy
+    // Forced Path Strategy (Fixed: Ensure ODD number of segments for Collections)
     const getPath = (colName) => {
       if (typeof __firebase_config !== 'undefined') {
         return `artifacts/${appId}/public/data/${colName}`;
       } else {
-        // Production Path - Hardcoded
-        return `egerak_data/${colName}`; 
+        // Production Path - MUST be 3 segments: Collection/Document/Collection
+        // e.g., egerak_system/v1/logs
+        return `egerak_system/v1/${colName}`; 
       }
     };
 
@@ -169,7 +170,7 @@
     }
 
     // -------------------------
-    // Icon helper
+    // Icon helper (Lucide)
     // -------------------------
     const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, ...props }) => {
       if (typeof lucide === 'undefined') return <span className="text-xs text-red-500">?</span>;
@@ -236,7 +237,7 @@
     // -------------------------
     const PWASetup = () => {
       useEffect(() => {
-        // PWA setup logic here
+        // ... existing setup
       }, []);
       return null;
     };
