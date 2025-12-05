@@ -100,7 +100,7 @@
 
   <!-- App (JSX compiled by Babel) -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo, Component } = React;
+    const { useState, useEffect, useMemo, Component, useCallback } = React;
 
     // -------------------------
     // Error Boundary
@@ -188,6 +188,7 @@
     const ShieldAlert = createIcon('ShieldAlert');
     const UserCog = createIcon('UserCog');
     const Wifi = createIcon('Wifi');
+    const WifiOff = createIcon('WifiOff');
 
     // -------------------------
     // PWA & Utils
@@ -966,7 +967,9 @@
       const [successMsg, setSuccessMsg] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [showSuccessModal, setShowSuccessModal] = useState(false);
-      const [showSyncToast, setShowSyncToast] = useState(false); // New Toast State
+      const [showSyncToast, setShowSyncToast] = useState(false);
+      const [isOnline, setIsOnline] = useState(navigator.onLine);
+      const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting, connected, error
       
       const [logs, setLogs] = useState([]);
       const [dbUsers, setDbUsers] = useState([]);
@@ -975,20 +978,45 @@
       const [isDataLoaded, setIsDataLoaded] = useState(false);
       const [lastSyncTime, setLastSyncTime] = useState(null);
 
+      // --- 1. Window Focus/Online Handler ---
+      useEffect(() => {
+        const handleStatusChange = () => setIsOnline(navigator.onLine);
+        const handleVisibilityChange = () => {
+           if (document.visibilityState === 'visible' && authUser) {
+              console.log("Tab active: Forcing refresh...");
+              handleManualRefresh(); // Force refresh on tab wake
+           }
+        };
+        window.addEventListener('online', handleStatusChange);
+        window.addEventListener('offline', handleStatusChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+          window.removeEventListener('online', handleStatusChange);
+          window.removeEventListener('offline', handleStatusChange);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+      }, [authUser]);
+
+      // --- 2. Auth Listener ---
       useEffect(() => {
         const unsubscribeAuth = window.onAuthStateChanged(window.auth, (u) => {
-          if (u) setAuthUser(u);
+          if (u) {
+             setAuthUser(u);
+             setConnectionStatus('connected');
+          } else {
+             setAuthUser(null);
+          }
         });
         return () => unsubscribeAuth();
       }, []);
 
+      // --- 3. Firestore Listeners (Data Sync) ---
       useEffect(() => {
         if (!authUser) return;
         const { collection, onSnapshot, getPath } = window.fs;
         const db = window.db;
 
-        // Simplified Listener for Logs (Direct Collection Reference)
-        // This removes dependency on specific indexes which caused sync issues
+        // Listener for Logs
         const logsCol = collection(db, getPath('logs'));
         const unsubLogs = onSnapshot(logsCol, (snap) => {
           const loadedLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -998,16 +1026,24 @@
              const dateB = b.date ? new Date(b.date) : new Date(0);
              return dateB - dateA;
           });
-          // Ensure new reference for immutability
           setLogs([...loadedLogs]); 
           setLastSyncTime(new Date().toLocaleTimeString());
+          setConnectionStatus('connected');
           
           // Trigger sync toast animation
           setShowSyncToast(true);
           setTimeout(() => setShowSyncToast(false), 3000);
-          
           console.log("Logs synced:", loadedLogs.length);
-        }, (err) => console.error("Logs sync error:", err));
+        }, (err) => {
+            console.error("Logs sync error:", err);
+            setConnectionStatus('error');
+            // Show visible error if permissions fail
+            if (err.code === 'permission-denied') {
+                setError("Ralat Kebenaran: Sila semak 'Firestore Rules' di konsol Firebase anda.");
+            } else {
+                setError("Ralat Sambungan: " + err.message);
+            }
+        });
 
         const unsubUsers = onSnapshot(collection(db, getPath('users')), (snap) => {
            const loadedUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1030,7 +1066,7 @@
         };
       }, [authUser]);
 
-      // Sync user state when dbUsers updates (important for self-profile updates)
+      // Sync user state when dbUsers updates
       useEffect(() => {
         if (user && dbUsers.length > 0) {
            const me = dbUsers.find(u => u.id === user.id);
@@ -1040,7 +1076,6 @@
         }
       }, [dbUsers, user]);
 
-      // --- MANUAL REFRESH FUNCTION ---
       const handleManualRefresh = async () => {
          setIsDataLoaded(false);
          const { getDocs, collection, getPath } = window.fs;
@@ -1064,8 +1099,10 @@
              
              setSuccessMsg("Data dikemaskini secara manual.");
              setShowSuccessModal(true);
+             setConnectionStatus('connected');
          } catch(e) {
              console.error(e);
+             setConnectionStatus('error');
              alert("Gagal memuat semula data.");
          } finally {
              setIsDataLoaded(true);
@@ -1235,6 +1272,18 @@
             )}
 
             <main className="flex-1 md:ml-64">
+              {/* --- CONNECTION ERROR BANNER --- */}
+              {connectionStatus === 'error' && (
+                <div className="bg-red-600 text-white p-2 text-center text-xs font-bold">
+                   Sambungan terputus atau disekat. {error}
+                </div>
+              )}
+              {connectionStatus === 'connected' && !isOnline && (
+                <div className="bg-orange-500 text-white p-2 text-center text-xs font-bold">
+                   Tiada sambungan internet. Data mungkin tidak disegerakkan.
+                </div>
+              )}
+
               <div className="bg-white p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2 bg-slate-100 rounded-lg"><Menu className="w-5 h-5" /></button>
@@ -1244,9 +1293,13 @@
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="hidden sm:flex items-center text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 transition-all duration-300">
-                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span> 
-                     {lastSyncTime ? `Sync: ${lastSyncTime}` : 'Online Sync'}
+                  <div className={`hidden sm:flex items-center text-xs px-3 py-1 rounded-full border transition-all duration-300 ${
+                      connectionStatus === 'error' ? 'text-red-600 bg-red-50 border-red-100' : 
+                      !isOnline ? 'text-orange-600 bg-orange-50 border-orange-100' :
+                      'text-green-600 bg-green-50 border-green-100'
+                  }`}>
+                     <span className={`w-2 h-2 rounded-full mr-2 ${connectionStatus==='error'?'bg-red-500': !isOnline?'bg-orange-500':'bg-green-500 animate-pulse'}`}></span> 
+                     {connectionStatus === 'error' ? 'Ralat Sync' : !isOnline ? 'Offline' : (lastSyncTime ? `Sync: ${lastSyncTime}` : 'Online Sync')}
                   </div>
                 </div>
               </div>
