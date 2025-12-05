@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,7 +13,6 @@
   <script type="module">
     import { initRealtime, startRealtimeSync } from "./realtime-sync.js";
 
-    // === YOUR FIREBASE CONFIG (working + valid) ===
     const firebaseConfig = {
       apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do",
       authDomain: "egerak-4f922.firebaseapp.com",
@@ -23,12 +23,10 @@
       measurementId: "G-V6CGGJ81JG"
     };
 
-    // Initialize realtime sync engine
     await initRealtime(firebaseConfig);
 
     const editor = document.getElementById("editor");
 
-    // Start syncing text area with Firestore realtime
     const sync = startRealtimeSync({
       docPath: "documents/demo",
       getLocal: () => ({ text: editor.value }),
@@ -39,10 +37,50 @@
       }
     });
 
-    // Push changes on typing
     editor.addEventListener("input", () => {
       sync.pushLocalChange({ text: editor.value }, { author: "user" });
     });
   </script>
 </body>
 </html>
+
+
+<!-- realtime-sync.js -->
+<script type="text/plain" id="realtime-sync-js">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+let db;
+
+export async function initRealtime(config) {
+  const app = initializeApp(config);
+  db = getFirestore(app);
+  try {
+    await enableIndexedDbPersistence(db);
+  } catch (e) {
+    console.warn("Offline persistence unavailable", e);
+  }
+}
+
+export function startRealtimeSync({ docPath, getLocal, applyRemote }) {
+  const ref = doc(db, docPath);
+
+  onSnapshot(ref, (snapshot) => {
+    if (snapshot.exists()) {
+      applyRemote(snapshot.data());
+    }
+  });
+
+  return {
+    async pushLocalChange(payload, meta = {}) {
+      await setDoc(ref, {
+        ...payload,
+        _meta: {
+          updated: Date.now(),
+          ...meta
+        }
+      });
+    }
+  };
+}
+</script>
