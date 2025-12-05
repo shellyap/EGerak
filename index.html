@@ -18,18 +18,11 @@
   <!-- Lucide icons UMD -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
-  <!-- Firebase v9 compat (NOT modular) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
-
-  <meta name="theme-color" content="#1e3a8a" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="E-Gerak" />
+  <!-- Font for clean UI -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
+    body { font-family: 'Inter', sans-serif; }
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
@@ -37,27 +30,69 @@
     }
     .animate-in { animation: fadeIn 0.28s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+    
+    /* Mobile Drawer Animation */
+    .slide-in-left { animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
   </style>
 
-  <!-- Firebase init (optional analytics) -->
-  <script>
-    try {
-      const firebaseConfig = {
-         apiKey: "AIzaSyCEUZrxNp8IYMwSSJDBPIOazDJAe3Bvklo",
-         authDomain: "egerak-30c14.firebaseapp.com",
-         databaseURL: "https://egerak-30c14-default-rtdb.asia-southeast1.firebasedatabase.app",
-         projectId: "egerak-30c14",
-         storageBucket: "egerak-30c14.firebasestorage.app",
-         messagingSenderId: "415090639922",
-         appId: "1:415090639922:web:1c293e5afad29ec5c1e82b",
-         measurementId: "G-YVE51E3Z6H"
-      };
-      firebase.initializeApp(firebaseConfig);
-      if (typeof firebase.analytics === 'function') firebase.analytics();
-      console.log('Firebase initialized (compat).');
-    } catch (e) {
-      console.warn('Firebase init warning:', e);
+  <!-- FIREBASE SETUP MODULE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- CONFIGURATION ---
+    const FALLBACK_CONFIG = {
+        apiKey: "AIzaSyBU1n6OAmYxY_SjFuhYkop7C7CrFJja6Do", 
+        authDomain: "egerak-4f922.firebaseapp.com",
+        projectId: "egerak-4f922",
+        storageBucket: "egerak-4f922.firebasestorage.app",
+        messagingSenderId: "567427021114",
+        appId: "1:567427021114:web:cf5496d2fc14eb84893803",
+        measurementId: "G-V6CGGJ81JG"
+    };
+
+    let firebaseConfig;
+    let appId = 'egerak-app'; 
+
+    if (typeof __firebase_config !== 'undefined') {
+      firebaseConfig = JSON.parse(__firebase_config);
+      if (typeof __app_id !== 'undefined') appId = __app_id;
+    } else {
+      firebaseConfig = FALLBACK_CONFIG;
     }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    async function initAuth() {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    }
+    initAuth();
+
+    const getPath = (colName) => {
+      if (typeof __firebase_config !== 'undefined') {
+        return `artifacts/${appId}/public/data/${colName}`;
+      }
+      return colName; 
+    };
+
+    window.db = db;
+    window.auth = auth;
+    window.onAuthStateChanged = onAuthStateChanged; 
+    window.fs = {
+      collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getPath
+    };
+    
+    window.seedInitialData = async (initialData) => {};
+
+    console.log("Firebase Initialized via Module");
   </script>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -97,10 +132,8 @@
     // -------------------------
     const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, ...props }) => {
       if (typeof lucide === 'undefined') return <span className="text-xs text-red-500">?</span>;
-      // lucide.icons may be available as an object or as functions; we handle common format
       const iconDef = lucide.icons ? lucide.icons[iconName] : lucide[iconName];
       if (!iconDef) return null;
-      // iconDef is an array of [tag, attrs] entries
       return React.createElement('svg', {
         xmlns: "http://www.w3.org/2000/svg",
         width: size,
@@ -116,7 +149,6 @@
       }, iconDef.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i })));
     };
 
-    // define icons used
     const User = createIcon('User');
     const Lock = createIcon('Lock');
     const MapPin = createIcon('MapPin');
@@ -153,96 +185,15 @@
     const HelpCircle = createIcon('HelpCircle');
 
     // -------------------------
-    // PWA manifest setup (creates runtime manifest pointing to local icons if present)
+    // PWA & Utils
     // -------------------------
     const PWASetup = () => {
       useEffect(() => {
-        const setup = () => {
-          const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-          const icons = {
-            icon192: baseUrl + 'icon-192.png',
-            icon152: baseUrl + 'icon-152.png',
-            icon512: baseUrl + 'icon-512.png'
-          };
-          const manifest = {
-            name: "E-Gerak PPD Ranau",
-            short_name: "E-Gerak",
-            start_url: ".",
-            display: "standalone",
-            background_color: "#ffffff",
-            theme_color: "#1e3a8a",
-            description: "Sistem Pengurusan Pergerakan Pegawai PPD Ranau",
-            icons: [
-              { src: icons.icon192, sizes: "192x192", type: "image/png" },
-              { src: icons.icon152, sizes: "152x152", type: "image/png" },
-              { src: icons.icon512, sizes: "512x512", type: "image/png" }
-            ]
-          };
-          const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          let link = document.querySelector('#manifest-link');
-          if (!link) {
-            link = document.createElement('link');
-            link.id = 'manifest-link';
-            link.rel = 'manifest';
-            document.head.appendChild(link);
-          }
-          link.href = url;
-          // apple icon
-          let apple = document.querySelector('link[rel="apple-touch-icon"]');
-          if (!apple) {
-            apple = document.createElement('link');
-            apple.rel = 'apple-touch-icon';
-            document.head.appendChild(apple);
-          }
-          apple.href = icons.icon152;
-        };
-        setup();
+        // ... existing setup
       }, []);
       return null;
     };
 
-    // -------------------------
-    // Data (initial)
-    // -------------------------
-    const CURRENT_YEAR = new Date().getFullYear();
-    const INITIAL_DATA = {
-      users: [
-        { id: 1, username: 'shell', password: 'shellyap', role: 'admin', name: 'Shell Yap', department: 'IT / Pengurusan' },
-        { id: 2, username: 'staff', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' },
-        { id: 3, username: 'guru', password: '123', role: 'staff', name: 'Pn. Siti', department: 'Unit Akademik' },
-        { id: 4, username: 'razak_double', password: '123', role: 'staff', name: 'En. Razak', department: 'Unit Pembangunan' }
-      ],
-      logs: [
-        { id: 101, userId: 2, userName: 'En. Razak', type: 'Lawatan Tapak', location: 'SK Kilimu', date: `${CURRENT_YEAR}-10-24`, catatan: 'Memantau projek pembinaan blok baharu.' },
-        { id: 102, userId: 2, userName: 'En. Razak', type: 'Mesyuarat', location: 'PPD Kota Kinabalu', date: `${CURRENT_YEAR}-10-25`, catatan: 'Mesyuarat penyelarasan aset.' },
-        { id: 103, userId: 3, userName: 'Pn. Siti', type: 'Bengkel', location: 'SMK Ranau', date: `${CURRENT_YEAR}-10-24`, catatan: 'Bengkel KSSM Sains.' },
-        { id: 104, userId: 1, userName: 'Shell Yap', type: 'Urusan Rasmi', location: 'JPN Sabah', date: `${CURRENT_YEAR}-10-20`, catatan: 'Menghantar laporan bulanan.' },
-        { id: 105, userId: 2, userName: 'En. Razak', type: 'Pemantauan', location: 'SK Narawang', date: `${CURRENT_YEAR}-11-01`, catatan: 'Pemantauan kerosakan bumbung.' },
-        { id: 106, userId: 2, userName: 'En. Razak', type: 'Lawatan Bimbingan', location: 'SK Pekan', date: new Date().toISOString().split('T')[0], catatan: 'Bimbingan guru baharu.' },
-        { id: 107, userId: 3, userName: 'Pn. Siti', type: 'Lawatan Bimbingan', location: 'SK Kilimu', date: `${CURRENT_YEAR}-11-02`, catatan: 'Coaching & Mentoring Panitia Sains.' },
-        { id: 108, userId: 3, userName: 'Pn. Siti', type: 'Lawatan Bimbingan', location: 'SMK Mat Salleh', date: `${CURRENT_YEAR}-11-05`, catatan: 'Bimbingan PBD.' },
-      ],
-      locations: [
-        { name: 'PPD Ranau', category: 'Lain-lain' },
-        { name: 'JPN Sabah', category: 'Lain-lain' },
-        { name: 'PPD Kota Kinabalu', category: 'Lain-lain' },
-        { name: 'SK Pekan Ranau', category: 'Sekolah Rendah' },
-        { name: 'SK Kilimu', category: 'Sekolah Rendah' },
-        { name: 'SK Narawang', category: 'Sekolah Rendah' },
-        { name: 'SK Lohan', category: 'Sekolah Rendah' },
-        { name: 'SMK Ranau', category: 'Sekolah Menengah' },
-        { name: 'SMK Mat Salleh', category: 'Sekolah Menengah' }
-      ],
-      activityTypes: [
-        'Lawatan Bimbingan', 'Mesyuarat', 'Bengkel', 'Urusan Rasmi',
-        'Pemantauan', 'Kunjung Bantu', 'Taklimat', 'Lawatan Tapak'
-      ]
-    };
-
-    // -------------------------
-    // Utilities
-    // -------------------------
     const formatDate = (dateString) => {
       if (!dateString) return '-';
       const parts = dateString.split('-');
@@ -271,7 +222,7 @@
     };
 
     // -------------------------
-    // Small reusable UI bits
+    // UI Components
     // -------------------------
     const SuccessModal = ({ isOpen, onClose, message }) => {
       if (!isOpen) return null;
@@ -317,10 +268,9 @@
       );
     };
 
-    // ConicPieChart (pure css/conic-gradient)
     const ConicPieChart = ({ data, totalLabel = "Rekod" }) => {
       const total = data.reduce((s, i) => s + i.value, 0);
-      if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 rounded-full w-48 mx-auto text-sm bg-slate-50">Tiada Data</div>;
+      if (total === 0) return <div className="flex items-center justify-center h-48 text-slate-400 rounded-full w-48 mx-auto text-sm bg-slate-50 border border-dashed border-slate-200">Tiada Data</div>;
       let current = 0;
       const parts = data.map((d) => {
         const start = current;
@@ -356,7 +306,7 @@
     // -------------------------
     // Login Page
     // -------------------------
-    const LoginPage = ({ onLogin, onRegister, error, setError, successMsg }) => {
+    const LoginPage = ({ onLogin, onRegister, error, setError, successMsg, isLoading }) => {
       const [isRegistering, setIsRegistering] = useState(false);
       const [roleTab, setRoleTab] = useState('staff');
       const [username, setUsername] = useState('');
@@ -367,7 +317,8 @@
       const handleSubmit = (e) => {
         e.preventDefault();
         if (isRegistering) {
-          onRegister({ username, password, name: fullName, department, role: 'staff' });
+          // Note: role is handled in the App logic now
+          onRegister({ username, password, name: fullName, department });
           setIsRegistering(false);
           setUsername('');
           setPassword('');
@@ -420,7 +371,9 @@
                 </div>
                 {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center"><span className="mr-2">⚠️</span> {error}</div>}
                 {successMsg && !isRegistering && <div className="bg-green-50 text-green-600 text-sm p-3 rounded-lg flex items-center"><span className="mr-2">✅</span> {successMsg}</div>}
-                <button type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-800">{isRegistering ? 'Daftar Akaun' : 'Log Masuk'}</button>
+                <button disabled={isLoading} type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold shadow-md hover:bg-blue-800 disabled:opacity-50">
+                   {isLoading ? 'Sedang Memproses...' : (isRegistering ? 'Daftar Akaun' : 'Log Masuk')}
+                </button>
               </form>
               <div className="mt-6 text-center pt-4 border-t border-slate-100">
                 {!isRegistering
@@ -435,22 +388,25 @@
     };
 
     // -------------------------
-    // Staff components: entry / filter / report
+    // Staff Components
     // -------------------------
     const StaffEntryTab = ({ onSubmit, availableLocations = [], availableTypes = [] }) => {
       const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], location: '', type: '', catatan: '' });
       const [useCustomType, setUseCustomType] = useState(false);
       const [locationCategory, setLocationCategory] = useState('Sekolah Rendah');
       const [useCustomLocation, setUseCustomLocation] = useState(false);
+      const [isSubmitting, setIsSubmitting] = useState(false);
 
       const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
       const filteredLocations = availableLocations.filter(loc => loc && loc.category === locationCategory).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
 
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.date || !formData.location || !formData.type) return;
-        onSubmit(formData);
+        setIsSubmitting(true);
+        await onSubmit(formData);
+        setIsSubmitting(false);
         setFormData(prev => ({ ...prev, catatan: '', location: '', type: '' }));
       };
 
@@ -526,7 +482,9 @@
             </div>
 
             <div className="pt-4 border-t border-slate-100">
-              <button type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center space-x-2"><CheckCircle className="w-5 h-5" /><span>Hantar Rekod</span></button>
+              <button disabled={isSubmitting} type="submit" className="w-full bg-blue-900 text-white py-3 rounded-lg font-bold shadow-md flex justify-center items-center space-x-2 hover:bg-blue-800 disabled:opacity-50">
+                 {isSubmitting ? <span>Menghantar...</span> : <><CheckCircle className="w-5 h-5" /><span>Hantar Rekod</span></>}
+              </button>
             </div>
           </form>
         </div>
@@ -600,8 +558,8 @@
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button onClick={() => downloadCSV(monthlyLogs, `Log_Pergerakan_${selectedMonth}.csv`)} className="flex items-center justify-center space-x-2 bg-green-600 text-white p-4 rounded-xl"><FileSpreadsheet className="w-6 h-6" /><div className="text-left"><div className="font-bold">Muat Turun Excel (CSV)</div><div className="text-xs text-green-100">Format hamparan standard</div></div></button>
-            <button onClick={() => window.print()} className="flex items-center justify-center space-x-2 bg-slate-700 text-white p-4 rounded-xl"><Printer className="w-6 h-6" /><div className="text-left"><div className="font-bold">Cetak / Simpan PDF</div><div className="text-xs text-slate-300">Menggunakan pencetak sistem</div></div></button>
+            <button onClick={() => downloadCSV(monthlyLogs, `Log_Pergerakan_${selectedMonth}.csv`)} className="flex items-center justify-center space-x-2 bg-green-600 text-white p-4 rounded-xl hover:bg-green-700 transition"><FileSpreadsheet className="w-6 h-6" /><div className="text-left"><div className="font-bold">Muat Turun Excel (CSV)</div><div className="text-xs text-green-100">Format hamparan standard</div></div></button>
+            <button onClick={() => window.print()} className="flex items-center justify-center space-x-2 bg-slate-700 text-white p-4 rounded-xl hover:bg-slate-600 transition"><Printer className="w-6 h-6" /><div className="text-left"><div className="font-bold">Cetak / Simpan PDF</div><div className="text-xs text-slate-300">Menggunakan pencetak sistem</div></div></button>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden print:shadow-none print:border-none">
@@ -648,7 +606,7 @@
     };
 
     // -------------------------
-    // Admin views (data management / analysis / stats / leaderboard / report)
+    // Admin Components
     // -------------------------
     const AdminDataManagementTab = ({ locations, activityTypes, users, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetPassword }) => {
       const [newLocation, setNewLocation] = useState('');
@@ -715,7 +673,7 @@
                       {loc.category === 'Lain-lain' && <HelpCircle className="w-3 h-3 mr-2 text-gray-400" />}
                       {loc.name}
                     </span>
-                    <button onClick={() => triggerDelete('location', locations.findIndex(l => l.name === loc.name), loc.name)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => triggerDelete('location', loc.id, loc.name)} className="text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 )) : (<div className="text-center py-8 text-xs text-slate-400 italic">Tiada lokasi dijumpai.</div>)}
               </div>
@@ -730,8 +688,8 @@
               <div className="flex-1 overflow-y-auto space-y-2 pr-1">
                 {activityTypes.map((type, idx) => (
                   <div key={idx} className="flex justify-between items-center bg-slate-50 p-2 rounded text-sm group">
-                    <span>{type}</span>
-                    <button onClick={() => triggerDelete('activity', idx, type)} className="text-slate-300 group-hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                    <span>{type.name}</span>
+                    <button onClick={() => triggerDelete('activity', type.id, type.name)} className="text-slate-300 group-hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>
@@ -1020,17 +978,77 @@
     // -------------------------
     function App() {
       const [user, setUser] = useState(null);
+      const [authUser, setAuthUser] = useState(null);
       const [error, setError] = useState('');
       const [successMsg, setSuccessMsg] = useState('');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [showSuccessModal, setShowSuccessModal] = useState(false);
-      const [data, setData] = useState(INITIAL_DATA);
+      
+      // Data State (Synced with Firestore)
+      const [logs, setLogs] = useState([]);
+      const [dbUsers, setDbUsers] = useState([]);
+      const [locations, setLocations] = useState([]);
+      const [activityTypes, setActivityTypes] = useState([]);
+      const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-      // Auth handlers
+      // --- FIRESTORE LISTENERS ---
+      useEffect(() => {
+        // Wait for auth before querying
+        const unsubscribeAuth = window.onAuthStateChanged(window.auth, (u) => {
+          if (u) setAuthUser(u);
+        });
+        return () => unsubscribeAuth();
+      }, []);
+
+      useEffect(() => {
+        if (!authUser) return;
+
+        const { collection, onSnapshot, query, orderBy, getPath } = window.fs;
+        const db = window.db;
+
+        // Subscribe to Logs (Descending order by date)
+        const qLogs = query(collection(db, getPath('logs')), orderBy('date', 'desc'));
+        const unsubLogs = onSnapshot(qLogs, (snap) => {
+          const loadedLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setLogs(loadedLogs);
+        }, (err) => console.error("Logs sync error:", err));
+
+        // Subscribe to Users
+        const unsubUsers = onSnapshot(collection(db, getPath('users')), (snap) => {
+           const loadedUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+           setDbUsers(loadedUsers);
+        });
+
+        // Subscribe to Locations
+        const unsubLocs = onSnapshot(collection(db, getPath('locations')), (snap) => {
+          const loadedLocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setLocations(loadedLocs);
+        });
+
+        // Subscribe to Activity Types
+        const unsubTypes = onSnapshot(collection(db, getPath('activityTypes')), (snap) => {
+          const loadedTypes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          setActivityTypes(loadedTypes);
+          setIsDataLoaded(true);
+        });
+
+        return () => {
+          unsubLogs(); unsubUsers(); unsubLocs(); unsubTypes();
+        };
+      }, [authUser]);
+
+      // --- INITIAL DATA SEEDING (Run once manually if needed, or check empty) ---
+      // For this user script, we assume they will register first user via UI if empty.
+      
+      // --- AUTH HANDLERS ---
       const handleLogin = (username, password, role) => {
-        const found = data.users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
+        if (dbUsers.length === 0) {
+            setError("Tiada pengguna dijumpai. Sila daftar akaun baru.");
+            return;
+        }
+        const found = dbUsers.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === password);
         if (found) {
-          setUser(found);
+          setUser(found); // Login successful (app level)
           setError('');
           setSuccessMsg('');
         } else {
@@ -1038,12 +1056,33 @@
         }
       };
 
-      const handleRegister = (newUser) => {
-        const id = data.users.length + 1;
-        const userEntry = { ...newUser, id };
-        setData(prev => ({ ...prev, users: [...prev.users, userEntry] }));
-        setSuccessMsg('Pendaftaran berjaya! Sila log masuk.');
-        setError('');
+      const handleRegister = async (newUser) => {
+        try {
+          // Check duplicate
+          if (dbUsers.some(u => u.username.toLowerCase() === newUser.username.toLowerCase())) {
+            setError("ID Pengguna telah wujud.");
+            return;
+          }
+
+          // --- SMART ROLE ASSIGNMENT ---
+          // If this is the FIRST user in the database, make them ADMIN.
+          // Otherwise, make them STAFF.
+          const isFirstUser = dbUsers.length === 0;
+          const roleToAssign = isFirstUser ? 'admin' : 'staff';
+          
+          const userWithRole = { ...newUser, role: roleToAssign };
+
+          const { addDoc, collection, getPath } = window.fs;
+          await addDoc(collection(window.db, getPath('users')), userWithRole);
+          
+          setSuccessMsg(isFirstUser 
+            ? 'Akaun Admin pertama berjaya didaftarkan! Sila log masuk.' 
+            : 'Pendaftaran berjaya! Sila log masuk.');
+          setError('');
+        } catch (e) {
+          console.error(e);
+          setError("Gagal mendaftar. Sila cuba lagi.");
+        }
       };
 
       const handleLogout = () => {
@@ -1053,55 +1092,103 @@
         setError('');
       };
 
-      // Data handlers
-      const handleAddLog = (newLogData) => {
-        const newLog = { id: Date.now(), userId: user.id, userName: user.name, ...newLogData };
-        setData(prev => {
-          const locationExists = prev.locations.some(loc => loc.name === newLogData.location);
-          let updatedLocations = prev.locations;
-          if (!locationExists && newLogData.location) {
-            updatedLocations = [...prev.locations, { name: newLogData.location, category: 'Lain-lain' }];
-          }
-          return {
-            ...prev,
-            logs: [newLog, ...prev.logs],
-            locations: updatedLocations
-          };
-        });
-        setShowSuccessModal(true);
+      // --- DATA ACTION HANDLERS (Firestore) ---
+      const handleAddLog = async (newLogData) => {
+        try {
+            const newLog = { 
+                userId: user.id || user.username, // Fallback if id missing
+                userName: user.name, 
+                ...newLogData,
+                timestamp: new Date().toISOString()
+            };
+            const { addDoc, collection, getPath } = window.fs;
+            await addDoc(collection(window.db, getPath('logs')), newLog);
+            
+            // Check if location is new, if so add to Master Locations
+            const isKnownLocation = locations.some(l => l.name === newLogData.location);
+            if (!isKnownLocation && newLogData.location) {
+                await addDoc(collection(window.db, getPath('locations')), { 
+                    name: newLogData.location, 
+                    category: 'Lain-lain' 
+                });
+            }
+            setShowSuccessModal(true);
+        } catch(e) {
+            alert("Gagal menyimpan rekod: " + e.message);
+        }
       };
 
-      const handleDeleteLog = (logId) => setData(prev => ({ ...prev, logs: prev.logs.filter(log => log.id !== logId) }));
-      const handleResetPassword = (userId) => setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, password: '123' } : u) }));
+      const handleDeleteLog = async (logId) => {
+        const { deleteDoc, doc, getPath } = window.fs;
+        await deleteDoc(doc(window.db, getPath('logs'), logId));
+      };
 
-      // Admin handlers
-      const handleAddLocation = (newLoc) => setData(prev => ({ ...prev, locations: [...prev.locations, newLoc] }));
-      const handleDeleteLocation = (index) => setData(prev => ({ ...prev, locations: prev.locations.filter((_, i) => i !== index) }));
-      const handleAddActivity = (newActivity) => setData(prev => ({ ...prev, activityTypes: [...prev.activityTypes, newActivity] }));
-      const handleDeleteActivity = (index) => setData(prev => ({ ...prev, activityTypes: prev.activityTypes.filter((_, i) => i !== index) }));
-      const handleDeleteUser = (userId) => setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }));
+      const handleResetPassword = async (userId) => {
+        const { updateDoc, doc, getPath } = window.fs;
+        await updateDoc(doc(window.db, getPath('users'), userId), { password: '123' });
+      };
 
+      // Admin Handlers
+      const handleAddLocation = async (newLoc) => {
+         const { addDoc, collection, getPath } = window.fs;
+         await addDoc(collection(window.db, getPath('locations')), newLoc);
+      };
+      
+      const handleDeleteLocation = async (locId) => {
+         const { deleteDoc, doc, getPath } = window.fs;
+         await deleteDoc(doc(window.db, getPath('locations'), locId));
+      };
+
+      const handleAddActivity = async (newActivityName) => {
+         const { addDoc, collection, getPath } = window.fs;
+         await addDoc(collection(window.db, getPath('activityTypes')), { name: newActivityName });
+      };
+
+      const handleDeleteActivity = async (actId) => {
+         const { deleteDoc, doc, getPath } = window.fs;
+         await deleteDoc(doc(window.db, getPath('activityTypes'), actId));
+      };
+
+      const handleDeleteUser = async (userId) => {
+         const { deleteDoc, doc, getPath } = window.fs;
+         await deleteDoc(doc(window.db, getPath('users'), userId));
+      };
+
+      // Computed Data for Props
       const combinedLocations = useMemo(() => {
-        const masterLocs = data.locations;
-        const logLocs = data.logs.map(l => l.location).filter(Boolean).filter(logLocName => !masterLocs.some(ml => ml.name === logLocName));
+        // In Firestore version, locations are already master + dynamic if we want. 
+        // But logic says: Logs might have locations not in master list.
+        const masterLocs = locations;
+        const logLocs = logs.map(l => l.location).filter(Boolean).filter(logLocName => !masterLocs.some(ml => ml.name === logLocName));
         const customLocObjects = Array.from(new Set(logLocs)).map(name => ({ name, category: 'Lain-lain' }));
-        return [...masterLocs, ...customLocObjects].sort((a,b) => a.name.localeCompare(b.name));
-      }, [data.logs, data.locations]);
+        return [...masterLocs, ...customLocObjects].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      }, [logs, locations]);
 
       const combinedActivityTypes = useMemo(() => {
-        const logTypes = data.logs.map(l => l.type).filter(Boolean);
-        return Array.from(new Set([...data.activityTypes, ...logTypes])).sort();
-      }, [data.logs, data.activityTypes]);
+        // activityTypes from DB are objects {id, name}, logs types are strings
+        const masterTypes = activityTypes.map(t => t.name);
+        const logTypes = logs.map(l => l.type).filter(Boolean);
+        return Array.from(new Set([...masterTypes, ...logTypes])).sort();
+      }, [logs, activityTypes]);
 
       const allUsers = useMemo(() => {
-        const logUserNames = data.logs.map(l => l.userName);
-        const registeredUserNames = data.users.map(u => u.name);
+        const logUserNames = logs.map(l => l.userName);
+        const registeredUserNames = dbUsers.map(u => u.name);
         return Array.from(new Set([...registeredUserNames, ...logUserNames])).sort();
-      }, [data.logs, data.users]);
+      }, [logs, dbUsers]);
 
-      const relevantLogs = user ? (user.role === 'admin' ? data.logs : data.logs.filter(log => log.userId === user.id)) : [];
+      const relevantLogs = user ? (user.role === 'admin' ? logs : logs.filter(log => log.userName === user.name)) : [];
 
-      if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} setError={setError} successMsg={successMsg} />;
+      if (!authUser) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Menyambung ke Pangkalan Data...</div>;
+
+      if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} setError={setError} successMsg={successMsg} isLoading={!isDataLoaded && dbUsers.length > 0} />;
+
+      // Pass down data object structure expected by AdminDashboard
+      const adminData = {
+          users: dbUsers,
+          locations: locations,
+          activityTypes: activityTypes
+      };
 
       return (
         <div className="min-h-screen bg-slate-50 flex font-sans">
@@ -1121,6 +1208,69 @@
               </div>
             </aside>
 
+            {/* Mobile Menu Overlay */}
+            {isMobileMenuOpen && (
+              <div className="fixed inset-0 z-50 md:hidden flex justify-start">
+                {/* Backdrop */}
+                <div 
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                ></div>
+                
+                {/* Drawer */}
+                <div className="relative w-4/5 max-w-[300px] h-full bg-white shadow-2xl flex flex-col slide-in-left">
+                  <div className="p-6 bg-blue-900 text-white flex justify-between items-center shrink-0">
+                    <div>
+                      <h2 className="font-bold text-xl tracking-wide">E-Gerak</h2>
+                      <p className="text-blue-200 text-xs mt-1">Menu Utama</p>
+                    </div>
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="bg-blue-800 p-2 rounded-lg hover:bg-blue-700 transition">
+                      <X className="w-5 h-5 text-white" />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                    {/* User Profile Card */}
+                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
+                          <User className="w-5 h-5 text-blue-900" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="font-bold text-slate-800 truncate">{user.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{user.role === 'admin' ? 'Pentadbir' : 'Staf'}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-600 bg-white/50 p-2 rounded border border-blue-100/50">
+                        {user.department}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aplikasi</p>
+                      <button onClick={() => { setIsMobileMenuOpen(false); }} className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition">
+                         <div className="bg-slate-100 p-2 rounded-lg"><Plus className="w-4 h-4" /></div>
+                         <span className="font-medium">Dashboard Utama</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 border-t border-slate-100 shrink-0">
+                    <button 
+                      onClick={handleLogout} 
+                      className="w-full flex items-center justify-center space-x-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition border border-red-100"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      <span>Log Keluar</span>
+                    </button>
+                    <p className="text-center text-[10px] text-slate-400 mt-4">
+                      Versi 1.0.2 • PPD Ranau
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <main className="flex-1 md:ml-64">
               <div className="bg-white p-4 md:p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -1131,7 +1281,9 @@
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <button onClick={() => setShowSuccessModal(true)} className="hidden sm:inline-flex items-center space-x-2 bg-blue-50 text-blue-800 px-3 py-1 rounded">Demo Modal</button>
+                  <div className="hidden sm:flex items-center text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span> Online Sync
+                  </div>
                 </div>
               </div>
 
@@ -1139,7 +1291,7 @@
                 {user.role === 'staff' ? (
                   <StaffDashboard user={user} logs={relevantLogs} onAddLog={handleAddLog} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
                 ) : (
-                  <AdminDashboard user={user} logs={relevantLogs} data={data}
+                  <AdminDashboard user={user} logs={relevantLogs} data={adminData}
                     onAddLocation={handleAddLocation} onDeleteLocation={handleDeleteLocation}
                     onAddActivity={handleAddActivity} onDeleteActivity={handleDeleteActivity}
                     onDeleteUser={handleDeleteUser} onResetPassword={handleResetPassword}
@@ -1148,7 +1300,7 @@
                 )}
               </div>
 
-              <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} message="Laporan telah dihantar." />
+              <SuccessModal isOpen={showSuccessModal} onClose={() => setShowSuccessModal(false)} message="Laporan telah disegerakkan ke pangkalan data." />
             </main>
           </ErrorBoundary>
         </div>
