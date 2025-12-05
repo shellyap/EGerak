@@ -12,13 +12,13 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- Babel (in-browser JSX) -->
+  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Lucide icons UMD -->
+  <!-- Lucide icons -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
-  <!-- Font for clean UI -->
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
@@ -37,21 +37,18 @@
     .toast-enter { animation: slideUpFade 0.3s ease-out forwards; }
     @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px) translateX(-50%); } to { opacity: 1; transform: translateY(0) translateX(-50%); } }
     
-    #debug-error { display: none; padding: 20px; background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; margin: 20px; border-radius: 8px; font-family: monospace; }
+    /* Debug Panel - Hidden by default for production, can toggle via console if needed */
+    #sys-debug {
+      position: fixed; bottom: 10px; right: 10px; 
+      background: rgba(0,0,0,0.8); color: #00ff00; 
+      font-family: monospace; font-size: 10px; 
+      padding: 8px; border-radius: 4px; z-index: 9999;
+      pointer-events: none; max-width: 200px;
+      display: none; 
+    }
   </style>
 
-  <!-- Global Error Handler for Blank Screen Debugging -->
-  <script>
-    window.onerror = function(msg, url, line, col, error) {
-      var debugEl = document.getElementById('debug-error');
-      if(debugEl) {
-        debugEl.style.display = 'block';
-        debugEl.innerHTML = "<strong>System Error:</strong><br>" + msg + "<br><br>Line: " + line + "<br>" + (error ? error.stack : '');
-      }
-    };
-  </script>
-
-  <!-- FIREBASE SETUP MODULE (Using Stable v10.12.0) -->
+  <!-- FIREBASE SETUP MODULE -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -71,6 +68,7 @@
     let firebaseConfig;
     let appId = 'egerak-app'; 
 
+    // Check environment
     if (typeof __firebase_config !== 'undefined') {
       firebaseConfig = JSON.parse(__firebase_config);
       if (typeof __app_id !== 'undefined') appId = __app_id;
@@ -82,6 +80,7 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // Initialize Auth
     async function initAuth() {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -96,14 +95,16 @@
     }
     initAuth();
 
+    // Forced Path Strategy
     const getPath = (colName) => {
       if (typeof __firebase_config !== 'undefined') {
         return `artifacts/${appId}/public/data/${colName}`;
+      } else {
+        // Production Path - Hardcoded
+        return `egerak_data/${colName}`; 
       }
-      return colName; 
     };
 
-    // Expose to global window for React
     window.db = db;
     window.auth = auth;
     window.onAuthStateChanged = onAuthStateChanged; 
@@ -115,7 +116,6 @@
   </script>
 </head>
 <body class="bg-slate-50 text-slate-900">
-  <div id="debug-error"></div>
   <div id="root">
     <div style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #64748b;">
        <div style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
@@ -123,6 +123,21 @@
        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
     </div>
   </div>
+
+  <!-- Debug Panel -->
+  <div id="sys-debug">
+     <div>Status: <span id="dbg-status">Init</span></div>
+     <div>Auth: <span id="dbg-auth">-</span></div>
+     <div>Logs: <span id="dbg-logs">0</span></div>
+     <div id="dbg-err" style="color:#ff5555"></div>
+  </div>
+
+  <script>
+     window.updateDebug = (key, val) => {
+        const el = document.getElementById(`dbg-${key}`);
+        if(el) el.innerText = val;
+     };
+  </script>
 
   <!-- App (JSX compiled by Babel) -->
   <script type="text/babel">
@@ -154,7 +169,7 @@
     }
 
     // -------------------------
-    // Icon helper (Lucide)
+    // Icon helper
     // -------------------------
     const createIcon = (iconName) => ({ color = "currentColor", size = 24, className, ...props }) => {
       if (typeof lucide === 'undefined') return <span className="text-xs text-red-500">?</span>;
@@ -221,7 +236,7 @@
     // -------------------------
     const PWASetup = () => {
       useEffect(() => {
-        // ... existing setup
+        // PWA setup logic here
       }, []);
       return null;
     };
@@ -969,10 +984,10 @@
 
           <div className="min-h-[500px]">
             {activeTab === 'data' && <AdminDataManagementTab locations={data.locations} activityTypes={data.activityTypes} users={data.users} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onDeleteUser={onDeleteUser} onResetPassword={onResetPassword} />}
-            {activeTab === 'analisis' && <AdminAnalysisTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
-            {activeTab === 'stats' && <AdminStatsTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
-            {activeTab === 'leaderboard' && <AdminLeaderboardTab logs={logs} />}
-            {activeTab === 'laporan' && <AdminReportTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+            {activeTab === 'analisis' && <AdminAnalysisTab key={logs.length} logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
+            {activeTab === 'stats' && <AdminStatsTab key={logs.length} logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+            {activeTab === 'leaderboard' && <AdminLeaderboardTab key={logs.length} logs={logs} />}
+            {activeTab === 'laporan' && <AdminReportTab key={logs.length} logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
             {activeTab === 'tetapan' && <AdminSettingsTab currentUser={user} users={data.users} onUpdateUser={onUpdateUser} onCreateUser={onCreateUser} />}
           </div>
         </div>
@@ -1002,11 +1017,17 @@
       const [lastSyncTime, setLastSyncTime] = useState(null);
       const [libLoaded, setLibLoaded] = useState(false);
 
+      // Update Debug Panel
+      const updateDebugPanel = (key, val) => {
+         if (window.updateDebug) window.updateDebug(key, val);
+      };
+
       // --- 0. Wait for Firebase Lib ---
       useEffect(() => {
         const timer = setInterval(() => {
           if (window.auth && window.db && window.onAuthStateChanged) {
             setLibLoaded(true);
+            updateDebugPanel('status', 'Lib Loaded');
             clearInterval(timer);
           }
         }, 50);
@@ -1018,6 +1039,8 @@
         const handleAuthError = (event) => {
            setAuthError(event.detail);
            setConnectionStatus('error');
+           updateDebugPanel('status', 'Auth Error');
+           updateDebugPanel('err', event.detail.message);
         };
         window.addEventListener('firebase-auth-error', handleAuthError);
         return () => window.removeEventListener('firebase-auth-error', handleAuthError);
@@ -1050,8 +1073,10 @@
              setAuthUser(u);
              setConnectionStatus('connected');
              setAuthError(null); // Clear error on success
+             updateDebugPanel('auth', 'OK: ' + u.uid.substring(0,5));
           } else {
              setAuthUser(null);
+             updateDebugPanel('auth', 'None');
           }
         });
         return () => unsubscribeAuth();
@@ -1062,6 +1087,8 @@
         if (!authUser || !libLoaded) return;
         const { collection, onSnapshot, getPath } = window.fs;
         const db = window.db;
+
+        updateDebugPanel('status', 'Listening...');
 
         // Listener for Logs
         const logsCol = collection(db, getPath('logs'));
@@ -1076,6 +1103,8 @@
           setLogs([...loadedLogs]); 
           setLastSyncTime(new Date().toLocaleTimeString());
           setConnectionStatus('connected');
+          updateDebugPanel('logs', loadedLogs.length);
+          updateDebugPanel('status', 'Live Sync');
           
           // Trigger sync toast animation
           setShowSyncToast(true);
@@ -1084,6 +1113,8 @@
         }, (err) => {
             console.error("Logs sync error:", err);
             setConnectionStatus('error');
+            updateDebugPanel('status', 'Listen Error');
+            updateDebugPanel('err', err.code);
             // Show visible error if permissions fail
             if (err.code === 'permission-denied') {
                 setError("Ralat Kebenaran: Sila semak 'Firestore Rules' di konsol Firebase anda.");
@@ -1347,7 +1378,7 @@
                 <div className="relative w-4/5 max-w-[300px] h-full bg-white shadow-2xl flex flex-col slide-in-left">
                   <div className="p-6 bg-blue-900 text-white flex justify-between items-center shrink-0"><div><h2 className="font-bold text-xl tracking-wide">E-Gerak</h2><p className="text-blue-200 text-xs mt-1">Menu Utama</p></div><button onClick={() => setIsMobileMenuOpen(false)} className="bg-blue-800 p-2 rounded-lg hover:bg-blue-700 transition"><X className="w-5 h-5 text-white" /></button></div>
                   <div className="flex-1 overflow-y-auto p-4 space-y-2"><div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6"><div className="flex items-center space-x-3 mb-2"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm"><User className="w-5 h-5 text-blue-900" /></div><div className="overflow-hidden"><p className="font-bold text-slate-800 truncate">{user.name}</p><p className="text-xs text-slate-500 truncate">{user.role === 'admin' ? 'Pentadbir' : 'Staf'}</p></div></div><p className="text-xs text-slate-600 bg-white/50 p-2 rounded border border-blue-100/50">{user.department}</p></div><div className="space-y-1"><p className="px-4 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Aplikasi</p><button onClick={() => { setIsMobileMenuOpen(false); }} className="w-full flex items-center space-x-3 px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-xl transition"><div className="bg-slate-100 p-2 rounded-lg"><Plus className="w-4 h-4" /></div><span className="font-medium">Dashboard Utama</span></button></div></div>
-                  <div className="p-4 border-t border-slate-100 shrink-0"><button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition border border-red-100"><LogOut className="w-5 h-5" /><span>Log Keluar</span></button><p className="text-center text-[10px] text-slate-400 mt-4">Versi 1.0.4 • PPD Ranau</p></div>
+                  <div className="p-4 border-t border-slate-100 shrink-0"><button onClick={handleLogout} className="w-full flex items-center justify-center space-x-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition border border-red-100"><LogOut className="w-5 h-5" /><span>Log Keluar</span></button><p className="text-center text-[10px] text-slate-400 mt-4">Versi 1.0.5 • PPD Ranau</p></div>
                 </div>
               </div>
             )}
