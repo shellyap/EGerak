@@ -925,8 +925,8 @@
 
           <div className="min-h-[500px]">
             {activeTab === 'data' && <AdminDataManagementTab locations={data.locations} activityTypes={data.activityTypes} users={data.users} onAddLocation={onAddLocation} onDeleteLocation={onDeleteLocation} onAddActivity={onAddActivity} onDeleteActivity={onDeleteActivity} onDeleteUser={onDeleteUser} onResetPassword={onResetPassword} />}
-            {activeTab === 'analisis' && <AdminAnalysisTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
-            {activeTab === 'stats' && <AdminStatsTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
+            {activeTab === 'analisis' && <AdminAnalysisTab key={logs.length} logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} onDeleteLog={onDeleteLog} />}
+            {activeTab === 'stats' && <AdminStatsTab key={logs.length} logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
             {activeTab === 'leaderboard' && <AdminLeaderboardTab logs={logs} />}
             {activeTab === 'laporan' && <AdminReportTab logs={logs} allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />}
             {activeTab === 'tetapan' && <AdminSettingsTab currentUser={user} users={data.users} onUpdateUser={onUpdateUser} onCreateUser={onCreateUser} />}
