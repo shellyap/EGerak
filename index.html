@@ -36,13 +36,26 @@
 
     .toast-enter { animation: slideUpFade 0.3s ease-out forwards; }
     @keyframes slideUpFade { from { opacity: 0; transform: translateY(20px) translateX(-50%); } to { opacity: 1; transform: translateY(0) translateX(-50%); } }
+    
+    #debug-error { display: none; padding: 20px; background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; margin: 20px; border-radius: 8px; font-family: monospace; }
   </style>
 
-  <!-- FIREBASE SETUP MODULE -->
+  <!-- Global Error Handler for Blank Screen Debugging -->
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      var debugEl = document.getElementById('debug-error');
+      if(debugEl) {
+        debugEl.style.display = 'block';
+        debugEl.innerHTML = "<strong>System Error:</strong><br>" + msg + "<br><br>Line: " + line + "<br>" + (error ? error.stack : '');
+      }
+    };
+  </script>
+
+  <!-- FIREBASE SETUP MODULE (Using Stable v10.12.0) -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // --- CONFIGURATION ---
     const FALLBACK_CONFIG = {
@@ -69,7 +82,6 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Initialize Auth and handle errors
     async function initAuth() {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -79,7 +91,6 @@
         }
       } catch (error) {
         console.error("Auth Failed:", error);
-        // Dispatch event so React can show the error
         window.dispatchEvent(new CustomEvent('firebase-auth-error', { detail: error }));
       }
     }
@@ -92,6 +103,7 @@
       return colName; 
     };
 
+    // Expose to global window for React
     window.db = db;
     window.auth = auth;
     window.onAuthStateChanged = onAuthStateChanged; 
@@ -103,7 +115,14 @@
   </script>
 </head>
 <body class="bg-slate-50 text-slate-900">
-  <div id="root"></div>
+  <div id="debug-error"></div>
+  <div id="root">
+    <div style="height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #64748b;">
+       <div style="width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
+       <p style="font-family: sans-serif; font-weight: 500;">Memuatkan Sistem...</p>
+       <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    </div>
+  </div>
 
   <!-- App (JSX compiled by Babel) -->
   <script type="text/babel">
@@ -981,6 +1000,18 @@
       const [activityTypes, setActivityTypes] = useState([]);
       const [isDataLoaded, setIsDataLoaded] = useState(false);
       const [lastSyncTime, setLastSyncTime] = useState(null);
+      const [libLoaded, setLibLoaded] = useState(false);
+
+      // --- 0. Wait for Firebase Lib ---
+      useEffect(() => {
+        const timer = setInterval(() => {
+          if (window.auth && window.db && window.onAuthStateChanged) {
+            setLibLoaded(true);
+            clearInterval(timer);
+          }
+        }, 50);
+        return () => clearInterval(timer);
+      }, []);
 
       // Listen for custom auth errors dispatched from initAuth
       useEffect(() => {
@@ -1013,6 +1044,7 @@
 
       // --- 2. Auth Listener ---
       useEffect(() => {
+        if (!libLoaded) return;
         const unsubscribeAuth = window.onAuthStateChanged(window.auth, (u) => {
           if (u) {
              setAuthUser(u);
@@ -1023,11 +1055,11 @@
           }
         });
         return () => unsubscribeAuth();
-      }, []);
+      }, [libLoaded]);
 
       // --- 3. Firestore Listeners (Data Sync) ---
       useEffect(() => {
-        if (!authUser) return;
+        if (!authUser || !libLoaded) return;
         const { collection, onSnapshot, getPath } = window.fs;
         const db = window.db;
 
@@ -1079,7 +1111,7 @@
         return () => {
           unsubLogs(); unsubUsers(); unsubLocs(); unsubTypes();
         };
-      }, [authUser]);
+      }, [authUser, libLoaded]);
 
       // Sync user state when dbUsers updates
       useEffect(() => {
@@ -1278,11 +1310,11 @@
          );
       }
 
-      if (!authUser) return (
+      if (!libLoaded || !authUser) return (
          <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
             <div className="flex flex-col items-center animate-pulse">
                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-               <span className="font-medium">Menyambung ke Pangkalan Data...</span>
+               <span className="font-medium">Memuatkan Sistem...</span>
             </div>
          </div>
       );
@@ -1385,7 +1417,7 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(<ErrorBoundary><App /></ErrorBoundary>);
 
   </script>
 </body>
