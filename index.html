@@ -40,7 +40,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // --- CONFIGURATION ---
     const FALLBACK_CONFIG = {
@@ -87,7 +87,7 @@
     window.auth = auth;
     window.onAuthStateChanged = onAuthStateChanged; 
     window.fs = {
-      collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getPath
+      collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, getPath, getDocs
     };
     
     console.log("Firebase Initialized via Module");
@@ -887,12 +887,33 @@
       );
     };
 
-    const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetPassword, onDeleteLog, onUpdateUser, onCreateUser, allUsers, combinedLocations, combinedActivityTypes }) => {
+    const AdminDashboard = ({ user, logs, data, onAddLocation, onDeleteLocation, onAddActivity, onDeleteActivity, onDeleteUser, onResetPassword, onDeleteLog, onUpdateUser, onCreateUser, allUsers, combinedLocations, combinedActivityTypes, onManualRefresh }) => {
       const [activeTab, setActiveTab] = useState('data');
 
       return (
         <div className="p-6 lg:p-10 flex-1">
-          <div className="mb-8"><h1 className="text-2xl font-bold text-slate-800">Dashboard Pentadbir</h1><p className="text-slate-500">{user.name}</p></div>
+          <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center">
+             <div>
+                <h1 className="text-2xl font-bold text-slate-800">Dashboard Pentadbir</h1>
+                <p className="text-slate-500">{user.name}</p>
+             </div>
+             <div className="mt-4 md:mt-0 flex items-center space-x-3">
+                <div className="flex flex-col items-end">
+                   <span className="text-xs text-slate-400 uppercase tracking-wider">Jumlah Rekod</span>
+                   <span className="text-2xl font-bold text-blue-900 leading-none">{logs.length}</span>
+                </div>
+                <div className="h-8 w-px bg-slate-200 mx-2"></div>
+                <button 
+                   onClick={onManualRefresh}
+                   className="flex items-center space-x-2 bg-white border border-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-blue-600 transition shadow-sm"
+                   title="Paksa kemaskini data dari pangkalan data"
+                >
+                   <RefreshCcw className="w-4 h-4" />
+                   <span className="text-xs font-bold">Muat Semula</span>
+                </button>
+             </div>
+          </div>
+          
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 border-b border-slate-200 mb-6 overflow-x-auto">
             <button onClick={() => setActiveTab('data')} className={`pb-3 px-4 shrink-0 ${activeTab==='data' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>1. Data</button>
             <button onClick={() => setActiveTab('analisis')} className={`pb-3 px-4 shrink-0 ${activeTab==='analisis' ? 'border-b-2 border-blue-900 text-blue-900' : 'text-slate-500'}`}>2. Analisis</button>
@@ -941,12 +962,15 @@
 
       useEffect(() => {
         if (!authUser) return;
-        const { collection, onSnapshot, query, getPath } = window.fs;
+        const { collection, onSnapshot, getPath } = window.fs;
         const db = window.db;
 
-        const qLogs = query(collection(db, getPath('logs')));
-        const unsubLogs = onSnapshot(qLogs, (snap) => {
+        // Simplified Listener for Logs (Direct Collection Reference)
+        // This removes dependency on specific indexes which caused sync issues
+        const logsCol = collection(db, getPath('logs'));
+        const unsubLogs = onSnapshot(logsCol, (snap) => {
           const loadedLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          // Client-side Sort
           loadedLogs.sort((a, b) => {
              const dateA = a.date ? new Date(a.date) : new Date(0);
              const dateB = b.date ? new Date(b.date) : new Date(0);
@@ -954,6 +978,7 @@
           });
           setLogs(loadedLogs);
           setLastSyncTime(new Date().toLocaleTimeString());
+          console.log("Logs synced:", loadedLogs.length);
         }, (err) => console.error("Logs sync error:", err));
 
         const unsubUsers = onSnapshot(collection(db, getPath('users')), (snap) => {
@@ -986,6 +1011,38 @@
            }
         }
       }, [dbUsers, user]);
+
+      // --- MANUAL REFRESH FUNCTION ---
+      const handleManualRefresh = async () => {
+         setIsDataLoaded(false);
+         const { getDocs, collection, getPath } = window.fs;
+         const db = window.db;
+         
+         try {
+             // Fetch Logs
+             const logsSnap = await getDocs(collection(db, getPath('logs')));
+             const loadedLogs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+             loadedLogs.sort((a, b) => {
+                 const dateA = a.date ? new Date(a.date) : new Date(0);
+                 const dateB = b.date ? new Date(b.date) : new Date(0);
+                 return dateB - dateA;
+             });
+             setLogs(loadedLogs);
+             setLastSyncTime(new Date().toLocaleTimeString());
+             
+             // Fetch Users
+             const usersSnap = await getDocs(collection(db, getPath('users')));
+             setDbUsers(usersSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+             
+             setSuccessMsg("Data dikemaskini secara manual.");
+             setShowSuccessModal(true);
+         } catch(e) {
+             console.error(e);
+             alert("Gagal memuat semula data.");
+         } finally {
+             setIsDataLoaded(true);
+         }
+      };
 
       const handleLogin = (username, password, role) => {
         if (dbUsers.length === 0) {
@@ -1022,7 +1079,6 @@
       };
 
       const handleAdminCreateUser = async (newUserData) => {
-         // Check for duplicate username
          if (dbUsers.some(u => u.username.toLowerCase() === newUserData.username.toLowerCase())) {
             alert("ID Pengguna telah wujud. Sila guna ID lain.");
             return false;
@@ -1178,6 +1234,7 @@
                     onDeleteLog={handleDeleteLog}
                     onUpdateUser={handleUpdateUser}
                     onCreateUser={handleAdminCreateUser}
+                    onManualRefresh={handleManualRefresh}
                     allUsers={allUsers} combinedLocations={combinedLocations} combinedActivityTypes={combinedActivityTypes} />
                 )}
               </div>
