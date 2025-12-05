@@ -69,11 +69,18 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // Initialize Auth and handle errors
     async function initAuth() {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth Failed:", error);
+        // Dispatch event so React can show the error
+        window.dispatchEvent(new CustomEvent('firebase-auth-error', { detail: error }));
       }
     }
     initAuth();
@@ -817,7 +824,6 @@
       const [filterStaff, setFilterStaff] = useState('');
       const [filterPlace, setFilterPlace] = useState('');
       const [filterType, setFilterType] = useState('');
-      
       const filteredLogs = useMemo(() => {
           return logs.filter(log => {
             if (!log.date) return false;
@@ -828,7 +834,6 @@
             return matchMonth && matchStaff && matchPlace && matchType;
           });
       }, [logs, filterMonth, filterStaff, filterPlace, filterType]);
-
       const [logToDelete, setLogToDelete] = useState(null);
       return (
         <div className="space-y-6"><div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100"><h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center"><Filter className="w-5 h-5 mr-2 text-blue-600" /> Saring Rekod (Slicers)</h3><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><div><label className="block text-xs font-semibold text-slate-500 mb-1">Bulan</label><input type="month" value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm" /></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Staf</label><select value={filterStaff} onChange={(e) => setFilterStaff(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Staf</option>{allUsers.map((u, i) => <option key={i} value={u}>{u}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Lokasi</label><select value={filterPlace} onChange={(e) => setFilterPlace(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Lokasi</option>{combinedLocations.map(loc => <option key={loc.name} value={loc.name}>{loc.name}</option>)}</select></div><div><label className="block text-xs font-semibold text-slate-500 mb-1">Perkara</label><select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 text-sm"><option value="">Semua Perkara</option>{combinedActivityTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}</select></div></div><div className="mt-4 flex justify-between items-center pt-2 border-t border-slate-50"><span className="text-sm text-slate-500">Jumlah Rekod: <strong>{filteredLogs.length}</strong></span><button onClick={() => { setFilterMonth(''); setFilterStaff(''); setFilterPlace(''); setFilterType(''); }} className="text-sm text-blue-600">Kosongkan Semua</button></div></div><div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm text-left text-slate-600"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-6 py-3">Tarikh</th><th className="px-6 py-3">Nama</th><th className="px-6 py-3">Lokasi</th><th className="px-6 py-3">Perkara</th><th className="px-6 py-3 text-right">Tindakan</th></tr></thead><tbody>{filteredLogs.length > 0 ? filteredLogs.map(log => (<tr key={log.id} className="border-b hover:bg-slate-50"><td className="px-6 py-4">{formatDate(log.date)}</td><td className="px-6 py-4 font-bold text-slate-800">{log.userName}</td><td className="px-6 py-4">{log.location}</td><td className="px-6 py-4">{log.type}</td><td className="px-6 py-4 text-right"><button onClick={() => setLogToDelete(log)} className="text-slate-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button></td></tr>)) : (<tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">Tiada rekod ditemui dengan saringan ini.</td></tr>)}</tbody></table></div></div>{logToDelete && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-red-100"><div className="text-center"><div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 className="w-8 h-8 text-red-600" /></div><h3 className="text-xl font-bold text-slate-800 mb-2">Padam Rekod?</h3><p className="text-slate-600 mb-6 text-sm">Tarikh: {formatDate(logToDelete.date)} <br />Oleh: {logToDelete.userName}<br /><span className="text-xs text-red-500 mt-2 block">Tindakan ini tidak boleh dikembalikan.</span></p><div className="flex space-x-3"><button onClick={() => setLogToDelete(null)} className="flex-1 bg-slate-100 py-2.5 rounded-lg">Batal</button><button onClick={() => { onDeleteLog(logToDelete.id); setLogToDelete(null); }} className="flex-1 bg-red-600 text-white py-2.5 rounded-lg">Padam</button></div></div></div></div>)}</div>
@@ -840,7 +845,6 @@
       const [filterStaff, setFilterStaff] = useState('');
       const [filterPlace, setFilterPlace] = useState('');
       const [filterType, setFilterType] = useState('');
-      
       const filteredLogs = useMemo(() => {
           return logs.filter(log => {
             if (!log.date) return false;
@@ -851,7 +855,6 @@
             return matchMonth && matchStaff && matchPlace && matchType;
           });
       }, [logs, filterMonth, filterStaff, filterPlace, filterType]);
-
       const getChartData = (key) => {
         const counts = filteredLogs.reduce((acc, log) => {
           const val = log[key] || 'Lain-lain';
@@ -970,6 +973,7 @@
       const [showSyncToast, setShowSyncToast] = useState(false);
       const [isOnline, setIsOnline] = useState(navigator.onLine);
       const [connectionStatus, setConnectionStatus] = useState('connecting'); // connecting, connected, error
+      const [authError, setAuthError] = useState(null); // Explicit auth error tracking
       
       const [logs, setLogs] = useState([]);
       const [dbUsers, setDbUsers] = useState([]);
@@ -977,6 +981,16 @@
       const [activityTypes, setActivityTypes] = useState([]);
       const [isDataLoaded, setIsDataLoaded] = useState(false);
       const [lastSyncTime, setLastSyncTime] = useState(null);
+
+      // Listen for custom auth errors dispatched from initAuth
+      useEffect(() => {
+        const handleAuthError = (event) => {
+           setAuthError(event.detail);
+           setConnectionStatus('error');
+        };
+        window.addEventListener('firebase-auth-error', handleAuthError);
+        return () => window.removeEventListener('firebase-auth-error', handleAuthError);
+      }, []);
 
       // --- 1. Window Focus/Online Handler ---
       useEffect(() => {
@@ -1003,6 +1017,7 @@
           if (u) {
              setAuthUser(u);
              setConnectionStatus('connected');
+             setAuthError(null); // Clear error on success
           } else {
              setAuthUser(null);
           }
@@ -1236,7 +1251,41 @@
 
       const relevantLogs = user ? (user.role === 'admin' ? logs : logs.filter(log => log.userName === user.name)) : [];
 
-      if (!authUser) return <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400 animate-pulse">Menyambung ke Pangkalan Data...</div>;
+      // --- CRITICAL AUTH ERROR DISPLAY ---
+      if (authError) {
+         return (
+            <div className="min-h-screen flex items-center justify-center bg-red-50 p-6">
+               <div className="bg-white p-8 rounded-xl shadow-lg border border-red-200 max-w-md text-center">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <WifiOff className="w-8 h-8 text-red-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-red-700 mb-2">Sambungan Gagal</h2>
+                  <p className="text-slate-600 mb-4 text-sm">
+                     Sistem tidak dapat menyambung ke pangkalan data Firebase.
+                  </p>
+                  <div className="bg-slate-100 p-3 rounded text-xs font-mono text-slate-700 mb-6 break-all">
+                     Error: {authError.message || JSON.stringify(authError)}
+                  </div>
+                  <div className="text-left text-xs text-slate-500 bg-blue-50 p-4 rounded border border-blue-100">
+                     <strong>Penyelesaian (Untuk Admin/Developer):</strong><br/>
+                     1. Buka Firebase Console.<br/>
+                     2. Pergi ke <em>Authentication &gt; Settings &gt; Authorized Domains</em>.<br/>
+                     3. Tambah domain ini: <strong>{window.location.hostname}</strong>
+                  </div>
+                  <button onClick={() => window.location.reload()} className="mt-6 w-full bg-red-600 text-white py-2 rounded-lg font-bold hover:bg-red-700">Cuba Semula</button>
+               </div>
+            </div>
+         );
+      }
+
+      if (!authUser) return (
+         <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-400">
+            <div className="flex flex-col items-center animate-pulse">
+               <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+               <span className="font-medium">Menyambung ke Pangkalan Data...</span>
+            </div>
+         </div>
+      );
 
       if (!user) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} error={error} setError={setError} successMsg={successMsg} isLoading={!isDataLoaded && dbUsers.length > 0} />;
 
